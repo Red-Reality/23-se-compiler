@@ -43,7 +43,6 @@ int main(int argc, const char *argv[])
     }
     else if (strcmp(mode,"-riscv")==0){
 
-
         freopen(output,"w",stdout);
 
         parse_string(ast->DumpKoopa().c_str());

@@ -8,102 +8,102 @@
 
 /// 用于记录当前寄存器用到几号
 /// %NAME_NUMBER 意思是下一个空着的变量符而不是最后一个已用的变量
-static int NAME_NUMBER =0;
+static int NAME_NUMBER = 0;
 //简化智能指针
-template <typename T>
+template<typename T>
 using point = std::unique_ptr<T>;
 
-
-class BaseAST
-{
+class BaseAST {
 public:
     virtual ~BaseAST() = default;
+
     virtual std::string DumpAST() const {
         return "Not Implement";
     };
+
     virtual std::string DumpKoopa() const {
         return "Not Implement";
     };
 };
 
 // CompUnit 是 BaseAST
-class CompUnitAST : public BaseAST
-{
+class CompUnitAST : public BaseAST {
 public:
     // 用智能指针管理对象
-    std::unique_ptr<BaseAST> func_def;
+    std::unique_ptr <BaseAST> func_def;
 
-    CompUnitAST(std::unique_ptr<BaseAST> &_func_def)
-    {
+    CompUnitAST(std::unique_ptr <BaseAST> &_func_def) {
         func_def = std::move(_func_def);
     }
+
 
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
 };
 
-// FuncDef 也是 BaseAST
-class FuncDefAST : public BaseAST
-{
+class FuncDefAST : public BaseAST {
 public:
-    std::unique_ptr<BaseAST> func_type;
+    std::unique_ptr <BaseAST> func_type;
     std::string ident;
-    std::unique_ptr<BaseAST> block;
+    std::unique_ptr <BaseAST> block;
 
-    FuncDefAST(std::unique_ptr<BaseAST> &_func_type, const char *_ident, std::unique_ptr<BaseAST> &_block)
-            : ident(_ident)
-    {
+    FuncDefAST(std::unique_ptr <BaseAST> &_func_type, const char *_ident, std::unique_ptr <BaseAST> &_block)
+            : ident(_ident) {
         func_type = std::move(_func_type);
         block = std::move(_block);
     }
 
+
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
 };
 
-class FuncTypeAST : public BaseAST
-{
+class FuncTypeAST : public BaseAST {
 public:
     std::string name;
+
     FuncTypeAST(const char *_name) : name(_name) {}
+
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
 };
 
-class BlockAST : public BaseAST
-{
+class BlockAST : public BaseAST {
 public:
-    std::unique_ptr<BaseAST> stmt;
-    BlockAST(std::unique_ptr<BaseAST> &_stmt)
-    {
+    std::unique_ptr <BaseAST> stmt;
+
+    BlockAST(std::unique_ptr <BaseAST> &_stmt) {
         stmt = std::move(_stmt);
     }
+
     std::string DumpAST() const override;
+
 
     std::string DumpKoopa() const override;
 };
 
-class StmtAST : public BaseAST
-{
+class StmtAST : public BaseAST {
 public:
-    std::unique_ptr<BaseAST> ret_num;
-    StmtAST(std::unique_ptr<BaseAST> &_ret_num)
-    {
+    std::unique_ptr <BaseAST> ret_num;
+
+    StmtAST(std::unique_ptr <BaseAST> &_ret_num) {
         ret_num = std::move(_ret_num);
     }
+
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
 };
 
-class NumberAST : public BaseAST
-{
+class NumberAST : public BaseAST {
 public:
     int val;
+
     NumberAST(int _val) : val(_val) {}
+
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
@@ -273,14 +273,16 @@ public:
         e_exp = std::move(_e_exp);
     }
     std::string DumpKoopa() const override;
+
+
 };
 
-class LOrExpAST:public BaseAST{
+class LOrExpAST:public BaseAST {
 public:
-    point<BaseAST> And_exp,Or_exp;
+    point<BaseAST> And_exp, Or_exp;
     AndOrType type = AndOrType::NoLogic;
 
-    LOrExpAST(point<BaseAST>& _And_exp){
+    LOrExpAST(point<BaseAST> &_And_exp) {
         And_exp = std::move(_And_exp);
     }
 

@@ -25,14 +25,10 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 // yylval 的定义, 我们把它定义成了一个联合体 (union)
 // 因为 token 的值有的是字符串指针, 有的是整数
 // 之前我们在 lexer 中用到的 str_val 和 int_val 就是在这里被定义的
-
-
 %union {
     std::string *str_val;
     int int_val;
     BaseAST *ast_val;
-
-
 }
 
 // lexer 返回的所有 token 种类的声明
@@ -40,8 +36,6 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 %token INT RETURN
 %token <str_val> IDENT LOR LAND EQ NEQ GEQ LEQ
 %token <int_val> INT_CONST
-
-
 
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt Number Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
@@ -121,8 +115,8 @@ UnaryExp
         $$ = new UnaryExpAST(unaryexp,UnaryOp::Negative);
     }
     | '!' UnaryExp{
-    auto unaryexp = std::unique_ptr<BaseAST>($2);
-    $$ = new UnaryExpAST(unaryexp,UnaryOp::LogicalFalse);
+        auto unaryexp = std::unique_ptr<BaseAST>($2);
+        $$ = new UnaryExpAST(unaryexp,UnaryOp::LogicalFalse);
     }
     ;
 
@@ -137,14 +131,14 @@ MulExp
         $$ = new MulExpAST(unaryexp,mulexp,MulType::Mul);
     }
     | MulExp '/' UnaryExp{
-    auto mulexp = std::unique_ptr<BaseAST>($1);
-    auto unaryexp = std::unique_ptr<BaseAST>($3);
-    $$ = new MulExpAST(unaryexp,mulexp,MulType::Div);
+        auto mulexp = std::unique_ptr<BaseAST>($1);
+        auto unaryexp = std::unique_ptr<BaseAST>($3);
+        $$ = new MulExpAST(unaryexp,mulexp,MulType::Div);
     }
     | MulExp '%' UnaryExp{
-     auto mulexp = std::unique_ptr<BaseAST>($1);
-     auto unaryexp = std::unique_ptr<BaseAST>($3);
-     $$ = new MulExpAST(unaryexp,mulexp,MulType::Mod);
+         auto mulexp = std::unique_ptr<BaseAST>($1);
+         auto unaryexp = std::unique_ptr<BaseAST>($3);
+         $$ = new MulExpAST(unaryexp,mulexp,MulType::Mod);
     }
     ;
 
@@ -159,9 +153,9 @@ AddExp
         $$ = new AddExpAST(mulexp,addexp,AddType::Add);
     }
     | AddExp '-' MulExp{
-     auto addexp = std::unique_ptr<BaseAST>($1);
-     auto mulexp = std::unique_ptr<BaseAST>($3);
-     $$ = new AddExpAST(mulexp,addexp,AddType::Sub);
+         auto addexp = std::unique_ptr<BaseAST>($1);
+         auto mulexp = std::unique_ptr<BaseAST>($3);
+         $$ = new AddExpAST(mulexp,addexp,AddType::Sub);
      }
     ;
 
@@ -231,6 +225,7 @@ LOrExp
         auto landexp = std::unique_ptr<BaseAST>($3);
         $$ = new LOrExpAST(lorexp,landexp);
     }
+
 Number
     : INT_CONST {
         $$ = new NumberAST($1);
