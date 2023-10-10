@@ -42,10 +42,10 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt Number
                 Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
-                BlockItem Decl LVal ConstDecl ConstInitVal ConstExp
+                Decl LVal  ConstInitVal ConstExp
 
-%type <blk_val> BlockItemList
-%type <cdf_val> ConstDefList ConstDef
+%type <blk_val> BlockItemList BlockItem
+%type <cdf_val> ConstDefList ConstDef ConstDecl
 
 %%
 
@@ -84,23 +84,25 @@ Block
     ;
 BlockItemList
     : BlockItem{
-        auto stmt = std::unique_ptr<BaseAST>($1);
-        $$ = new BlockItemAST(stmt);
+        $$ = $1;
     }
     | BlockItem BlockItemList{
         auto list = std::unique_ptr<BlockItemAST>($2);
-        auto stmt = std::unique_ptr<BaseAST>($1);
-        list->AddItem(stmt);
+        auto stmt = $1;
+        stmt->AddItem(list);
+        $$ = stmt;
     }
 BlockItem
-    : Stmt{
-        auto stmt = std::unique_ptr<BaseAST>($1);
-        $$ = new BlockItemAST(stmt);
-    }
-    | Decl{
+    :
+    Decl{
         auto decl = std::unique_ptr<BaseAST>($1);
         $$ = new BlockItemAST(decl);
     }
+    |Stmt{
+        auto stmt = std::unique_ptr<BaseAST>($1);
+        $$ = new BlockItemAST(stmt);
+    }
+
 
 
 Stmt
@@ -118,14 +120,12 @@ Decl
     : ConstDecl{
         auto cd = point<BaseAST>($1);
         $$ = new DeclAST(cd,1);
-
     }
     ;
 
 ConstDecl
     : CONST INT ConstDefList ';'{
-        auto CDL = point<BaseAST>($3);
-        $$ = CDL.get();
+        $$ = $3;
     }
 ConstDefList
     :ConstDef{
@@ -133,7 +133,7 @@ ConstDefList
     }
     | ',' ConstDef ConstDefList{
         $$ = $3;
-        auto cd = point<BaseAST>($2);
+        auto cd = point<ConstDefAST>($2);
         $$->AddItem(cd);
     }
     ;
@@ -168,6 +168,10 @@ PrimaryExp
     | Number{
         auto number = std::unique_ptr<BaseAST>($1);
         $$ = new PrimaryExpAST(number);
+    }
+    | LVal{
+        auto lval = std::unique_ptr<BaseAST>($1);
+        $$ = new PrimaryExpAST(lval);
     }
     ;
 

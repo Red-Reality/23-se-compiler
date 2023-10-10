@@ -88,11 +88,8 @@ public:
     //插入符号表
     BlockAST(std::unique_ptr <BaseAST> &_stmt) {
         stmt = std::move(_stmt);
-        CONSTVAL_MAP.push_back(unordered_map<string,int>());
     }
-    ~BlockAST(){
-        CONSTVAL_MAP.pop_back();
-    }
+
 
     std::string DumpAST() const override;
 
@@ -103,14 +100,23 @@ public:
 class BlockItemAST:public BaseAST{
 public:
     point<BaseAST> stmt;
-    point<BaseAST> next;
-    void AddItem(point<BaseAST> &_next){
-        next = std::move(_next);
+    point<BlockItemAST> next;
+    void AddItem(point<BlockItemAST> &_next){
+        if (next == nullptr) {
+            next = std::move(_next);
+        } else {
+            BlockItemAST* tmp=next.get();
+            while (tmp->next!= nullptr){
+                tmp=tmp->next.get();
+            }
+            tmp->next = std::move(_next);
+        }
     }
 
     BlockItemAST(point<BaseAST> &_stmt){
         stmt=std::move(_stmt);
     }
+    std::string DumpKoopa() const override;
 };
 
 class StmtAST : public BaseAST {
@@ -427,22 +433,33 @@ public:
         decl = std::move(_decl);
         Is_Const = is_const;
     }
+    string DumpKoopa() const override;
 };
 
 //链表记录ConstDef
 //初始化时直接插入符号表
 class ConstDefAST :public BaseAST{
 public:
-    point<BaseAST> next;
-    ConstDefAST(string name,point<BaseAST>& _exp){
-        assert(!CONSTVAL_MAP.empty());
-        unordered_map<string,int>& lastMap = CONSTVAL_MAP.back();
-        lastMap[name] = _exp->Calc();
-    }
-    void AddItem(point<BaseAST>& _next){
-        next=std::move(_next);
-    }
+    point<ConstDefAST> next;
+    string name;
+    point<BaseAST> exp;
+    ConstDefAST(string _name,point<BaseAST>& _exp){
+        name = _name;
+        exp=std::move(_exp);
 
+    }
+    void AddItem(point<ConstDefAST>& _next){
+        if (next == nullptr) {
+            next = std::move(_next);
+        } else {
+            ConstDefAST* tmp=next.get();
+            while (tmp->next!= nullptr){
+                tmp=tmp->next.get();
+            }
+            tmp->next = std::move(_next);
+        }
+    }
+    string DumpKoopa() const override;
 };
 
 class LValAST :public BaseAST{
@@ -455,5 +472,7 @@ public:
     int Calc() const override{
         return GetLvalValue(CONSTVAL_MAP,name);
     }
+
+    string DumpKoopa() const override;
 };
 

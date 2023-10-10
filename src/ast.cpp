@@ -40,11 +40,27 @@ std::string FuncTypeAST::DumpKoopa() const {
 }
 
 std::string BlockAST::DumpAST() const {
-    return "BlockAST { \n" + stmt->DumpAST() + " }";
+
+    string rslt = "BlockAST { \n" + stmt->DumpAST() + " }";
+
+    return rslt;
 }
 
+std::string BlockItemAST::DumpKoopa() const {
+    ostringstream oss;
+    oss<<stmt->DumpKoopa();
+    cerr<<oss.str();
+    if(next!= nullptr)
+        oss<<next->DumpKoopa();
+    return oss.str();
+}
 std::string BlockAST::DumpKoopa() const {
-    return "%entry:\n" + stmt->DumpKoopa();
+    CONSTVAL_MAP.push_back(unordered_map<string,int>());
+
+    string rslt = "%entry:\n" + stmt->DumpKoopa();
+    CONSTVAL_MAP.pop_back();
+
+    return rslt;
 }
 
 std::string StmtAST::DumpAST() const {
@@ -52,7 +68,30 @@ std::string StmtAST::DumpAST() const {
 }
 
 std::string StmtAST::DumpKoopa() const {
-    return num->DumpKoopa()+"\tret %"+ to_string(NAME_NUMBER-1);
+    if(!Is_LVal)
+        return num->DumpKoopa()+"\tret %"+ to_string(NAME_NUMBER-1);
+    else{
+        cerr<<"Not Implied Val"<<endl;
+        assert(0);
+    }
+}
+
+std::string DeclAST::DumpKoopa() const {
+    // 常量的话只需要记录符号表不需要输出
+    if(Is_Const)
+        return decl->DumpKoopa();
+    else{
+        cerr<<"变量输出尚未实现"<<endl;
+        assert(0);
+    }
+}
+
+std::string ConstDefAST::DumpKoopa() const{
+    unordered_map<string,int>& lastMap = CONSTVAL_MAP.back();
+    lastMap[name] = exp->Calc();
+    if(next!= nullptr)
+        next->DumpKoopa();
+    return "";
 }
 
 std::string NumberAST::DumpAST() const {
@@ -311,4 +350,10 @@ std::string LOrExpAST::DumpKoopa() const {
         NAME_NUMBER++;
         return reslt.str();
     }
+}
+
+string LValAST::DumpKoopa() const {
+    ostringstream oss;
+    oss<<"\t%"<<NAME_NUMBER++<<"= add 0, "<<Calc()<<endl;
+    return oss.str();
 }

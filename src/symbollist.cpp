@@ -18,8 +18,6 @@ bool HasName(vector<unordered_map<string,int>>& sel_map,const string& name){
 
 /// 获取符号表中的值
 int GetLvalValue(vector<unordered_map<string,int>>& sel_map,const string& name){
-
-
     for (auto it = sel_map.rbegin(); it != sel_map.rend(); ++it){
         const std::unordered_map<std::string, int>& map = *it;
         auto found = map.find(name);
