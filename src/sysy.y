@@ -29,16 +29,23 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
     std::string *str_val;
     int int_val;
     BaseAST *ast_val;
+    BlockItemAST *blk_val;
+    ConstDefAST* cdf_val;
 }
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN
+%token INT RETURN CONST
 %token <str_val> IDENT LOR LAND EQ NEQ GEQ LEQ
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
-%type <ast_val> FuncDef FuncType Block Stmt Number Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
+%type <ast_val> FuncDef FuncType Block Stmt Number
+                Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
+                BlockItem Decl LVal ConstDecl ConstInitVal ConstExp
+
+%type <blk_val> BlockItemList
+%type <cdf_val> ConstDefList ConstDef
 
 %%
 
@@ -70,16 +77,79 @@ FuncType
     ;
 
 Block
-    : '{' Stmt '}' {
+    : '{' BlockItemList '}' {
         auto stmt = std::unique_ptr<BaseAST>($2);
         $$ = new BlockAST(stmt);
     }
     ;
+BlockItemList
+    : BlockItem{
+        auto stmt = std::unique_ptr<BaseAST>($1);
+        $$ = new BlockItemAST(stmt);
+    }
+    | BlockItem BlockItemList{
+        auto list = std::unique_ptr<BlockItemAST>($2);
+        auto stmt = std::unique_ptr<BaseAST>($1);
+        list->AddItem(stmt);
+    }
+BlockItem
+    : Stmt{
+        auto stmt = std::unique_ptr<BaseAST>($1);
+        $$ = new BlockItemAST(stmt);
+    }
+    | Decl{
+        auto decl = std::unique_ptr<BaseAST>($1);
+        $$ = new BlockItemAST(decl);
+    }
+
 
 Stmt
     : RETURN Exp ';' {
         auto exp = std::unique_ptr<BaseAST>($2);
         $$ = new StmtAST(exp);
+    }
+    | LVal '=' Exp ';'{
+        auto lval = std::unique_ptr<BaseAST>($1);
+        auto exp = std::unique_ptr<BaseAST>($3);
+        $$ = new StmtAST(exp,lval);
+    }
+    ;
+Decl
+    : ConstDecl{
+        auto cd = point<BaseAST>($1);
+        $$ = new DeclAST(cd,1);
+
+    }
+    ;
+
+ConstDecl
+    : CONST INT ConstDefList ';'{
+        auto CDL = point<BaseAST>($3);
+        $$ = CDL.get();
+    }
+ConstDefList
+    :ConstDef{
+        $$ = $1;
+    }
+    | ',' ConstDef ConstDefList{
+        $$ = $3;
+        auto cd = point<BaseAST>($2);
+        $$->AddItem(cd);
+    }
+    ;
+ConstDef
+    : IDENT '=' ConstInitVal{
+        string name = *unique_ptr<string>($1);
+        auto exp = point<BaseAST>($3);
+        $$ = new ConstDefAST(name,exp);
+    }
+    ;
+ConstInitVal : ConstExp;
+ConstExp : Exp;
+LVal
+    :IDENT{
+        string name =*($1);
+        $$ = new LValAST(name);
     }
     ;
 

@@ -4,6 +4,11 @@
 #include <string>
 #include <iostream>
 #include <cstdlib>
+#include <unordered_map>
+#include <vector>
+#include <cassert>
+#include "symbollist.h"
+using namespace std;
 // 所有 AST 的基类
 
 /// 用于记录当前寄存器用到几号
@@ -12,6 +17,7 @@ static int NAME_NUMBER = 0;
 //简化智能指针
 template<typename T>
 using point = std::unique_ptr<T>;
+
 
 class BaseAST {
 public:
@@ -24,6 +30,10 @@ public:
     virtual std::string DumpKoopa() const {
         return "Not Implement";
     };
+    virtual int Calc() const {
+        cerr<<"Not Implied Calc,unexcept situation may be occur"<<endl;
+        return 0;
+    }
 };
 
 // CompUnit 是 BaseAST
@@ -71,28 +81,55 @@ public:
     std::string DumpKoopa() const override;
 };
 
+
 class BlockAST : public BaseAST {
 public:
     std::unique_ptr <BaseAST> stmt;
-
+    //插入符号表
     BlockAST(std::unique_ptr <BaseAST> &_stmt) {
         stmt = std::move(_stmt);
+        CONSTVAL_MAP.push_back(unordered_map<string,int>());
+    }
+    ~BlockAST(){
+        CONSTVAL_MAP.pop_back();
     }
 
     std::string DumpAST() const override;
 
-
     std::string DumpKoopa() const override;
+};
+
+//用链表的方式来记录block内的所有语句
+class BlockItemAST:public BaseAST{
+public:
+    point<BaseAST> stmt;
+    point<BaseAST> next;
+    void AddItem(point<BaseAST> &_next){
+        next = std::move(_next);
+    }
+
+    BlockItemAST(point<BaseAST> &_stmt){
+        stmt=std::move(_stmt);
+    }
 };
 
 class StmtAST : public BaseAST {
 public:
-    std::unique_ptr <BaseAST> ret_num;
+
+    bool Is_LVal;
+    std::unique_ptr <BaseAST> num;
+    std::unique_ptr<BaseAST> lvalname;
 
     StmtAST(std::unique_ptr <BaseAST> &_ret_num) {
-        ret_num = std::move(_ret_num);
+        num = std::move(_ret_num);
+        Is_LVal= false;
     }
 
+    StmtAST(point<BaseAST>& _num,point<BaseAST>& _lvalname){
+        num = std::move(_num);
+        lvalname = std::move(_lvalname);
+        Is_LVal= true;
+    }
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
@@ -107,6 +144,9 @@ public:
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
+    int Calc() const override{
+        return val;
+    }
 };
 
 class ExpAST: public BaseAST{
@@ -119,6 +159,10 @@ public:
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
+
+    int Calc() const override{
+        return unary_exp->Calc();
+    }
 };
 
 class PrimaryExpAST :public BaseAST{
@@ -130,6 +174,10 @@ public:
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
+
+    int Calc() const override{
+        return p_exp->Calc();
+    }
 };
 
 enum class UnaryOp{
@@ -151,6 +199,17 @@ public:
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
+
+    int Calc() const override{
+        switch (type) {
+            case UnaryOp::Positive:
+                return u_exp->Calc();
+            case UnaryOp::Negative:
+                return -u_exp->Calc();
+            case UnaryOp::LogicalFalse:
+                return !u_exp->Calc();
+        }
+    }
 };
 
 enum class MulType{
@@ -176,6 +235,19 @@ public:
 
     std::string DumpKoopa() const override;
 
+    int Calc() const override{
+        switch (type) {
+            case MulType::NotMul:
+                return u_exp->Calc();
+            case MulType::Mul:
+                return m_exp->Calc()*u_exp->Calc();
+            case MulType::Div:
+                return m_exp->Calc()/u_exp->Calc();
+            case MulType::Mod:
+                return m_exp->Calc()%u_exp->Calc();
+        }
+    }
+
 };
 
 enum class AddType{
@@ -197,7 +269,16 @@ public:
     AddExpAST(point<BaseAST>& _m_exp){
         m_exp=std::move(_m_exp);
     }
-
+    int Calc() const override{
+        switch (type) {
+            case AddType::NotAdd:
+                return m_exp->Calc();
+            case AddType::Add:
+                return a_exp->Calc()+m_exp->Calc();
+            case AddType::Sub:
+                return a_exp->Calc()-m_exp->Calc();
+        }
+    }
 
     std::string DumpKoopa() const override;
 };
@@ -223,7 +304,20 @@ public:
         r_exp = std::move(_r_exp);
         type=_type;
     }
-
+    int Calc() const override{
+        switch (type) {
+            case RelType::NoRel:
+                return a_exp->Calc();
+            case RelType::Less:
+                return r_exp->Calc()<a_exp->Calc();
+            case RelType::Bigger:
+                return r_exp->Calc()>a_exp->Calc();
+            case RelType::LessEq:
+                return r_exp->Calc()<=a_exp->Calc();
+            case RelType::BiggerEq:
+                return r_exp->Calc()>=a_exp->Calc();
+        }
+    }
     std::string DumpKoopa() const override;
 };
 
@@ -247,7 +341,16 @@ public:
         e_exp = std::move(_e_exp);
         r_exp = std::move(_r_exp);
     }
-
+    int Calc() const override{
+        switch (type) {
+            case EqType::NoEq:
+                return r_exp->Calc();
+            case EqType::Equal:
+                return e_exp->Calc()==r_exp->Calc();
+            case EqType::NotEqual:
+                return e_exp->Calc()!=r_exp->Calc();
+        }
+    }
     std::string DumpKoopa() const override;
 };
 
@@ -272,6 +375,17 @@ public:
         l_exp = std::move(_l_exp);
         e_exp = std::move(_e_exp);
     }
+
+    int Calc() const override{
+        switch (type) {
+            case AndOrType::NoLogic:
+                return e_exp->Calc();
+            case AndOrType::And:
+                return l_exp->Calc()&&e_exp->Calc();
+            default:
+                assert(0);
+        }
+    }
     std::string DumpKoopa() const override;
 
 
@@ -291,5 +405,55 @@ public:
         And_exp = std::move(_And_exp);
         Or_exp = std::move(_Or_exp);
     }
+
+    int Calc() const override{
+        switch (type) {
+            case AndOrType::NoLogic:
+                return And_exp->Calc();
+            case AndOrType::Or:
+                return Or_exp->Calc()||And_exp->Calc();
+            default:
+                assert(0);
+        }
+    }
     std::string DumpKoopa() const override;
 };
+
+class DeclAST :public BaseAST{
+public:
+    bool Is_Const;
+    point<BaseAST> decl;
+    DeclAST(point<BaseAST>& _decl, bool is_const){
+        decl = std::move(_decl);
+        Is_Const = is_const;
+    }
+};
+
+//链表记录ConstDef
+//初始化时直接插入符号表
+class ConstDefAST :public BaseAST{
+public:
+    point<BaseAST> next;
+    ConstDefAST(string name,point<BaseAST>& _exp){
+        assert(!CONSTVAL_MAP.empty());
+        unordered_map<string,int>& lastMap = CONSTVAL_MAP.back();
+        lastMap[name] = _exp->Calc();
+    }
+    void AddItem(point<BaseAST>& _next){
+        next=std::move(_next);
+    }
+
+};
+
+class LValAST :public BaseAST{
+public:
+    string name;
+    LValAST(string _name):name(_name){
+        ;
+    }
+
+    int Calc() const override{
+        return GetLvalValue(CONSTVAL_MAP,name);
+    }
+};
+

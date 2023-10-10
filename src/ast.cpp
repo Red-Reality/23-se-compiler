@@ -48,11 +48,11 @@ std::string BlockAST::DumpKoopa() const {
 }
 
 std::string StmtAST::DumpAST() const {
-    return "StmtAST { return, \n" + ret_num->DumpAST() + " }";
+    return "StmtAST { return, \n" + num->DumpAST() + " }";
 }
 
 std::string StmtAST::DumpKoopa() const {
-    return ret_num->DumpKoopa()+"\tret %"+ to_string(NAME_NUMBER-1);
+    return num->DumpKoopa()+"\tret %"+ to_string(NAME_NUMBER-1);
 }
 
 std::string NumberAST::DumpAST() const {
