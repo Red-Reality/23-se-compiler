@@ -49,16 +49,16 @@ std::string BlockAST::DumpAST() const {
 std::string BlockItemAST::DumpKoopa() const {
     ostringstream oss;
     oss<<stmt->DumpKoopa();
-    cerr<<oss.str();
+
     if(next!= nullptr)
         oss<<next->DumpKoopa();
     return oss.str();
 }
 std::string BlockAST::DumpKoopa() const {
-    CONSTVAL_MAP.push_back(unordered_map<string,int>());
+    VAL_MAP.push_back(unordered_map<string,symboltype>());
 
     string rslt = "%entry:\n" + stmt->DumpKoopa();
-    CONSTVAL_MAP.pop_back();
+    VAL_MAP.pop_back();
 
     return rslt;
 }
@@ -71,24 +71,27 @@ std::string StmtAST::DumpKoopa() const {
     if(!Is_LVal)
         return num->DumpKoopa()+"\tret %"+ to_string(NAME_NUMBER-1);
     else{
-        cerr<<"Not Implied Val"<<endl;
-        assert(0);
+        ostringstream oss;
+       //求值
+       oss<<num->DumpKoopa();
+
+       //存储
+       oss<<name->DumpKoopa();
+
+       return oss.str();
     }
 }
 
 std::string DeclAST::DumpKoopa() const {
     // 常量的话只需要记录符号表不需要输出
-    if(Is_Const)
-        return decl->DumpKoopa();
-    else{
-        cerr<<"变量输出尚未实现"<<endl;
-        assert(0);
-    }
+    // 变量的话记录符号并在koopa中alloc
+    return decl->DumpKoopa();
 }
 
 std::string ConstDefAST::DumpKoopa() const{
-    unordered_map<string,int>& lastMap = CONSTVAL_MAP.back();
-    lastMap[name] = exp->Calc();
+    unordered_map<string,symboltype>& lastMap = VAL_MAP.back();
+    symboltype record ={exp->Calc(),ValType::Const};
+    lastMap[name] = record;
     if(next!= nullptr)
         next->DumpKoopa();
     return "";
@@ -354,6 +357,55 @@ std::string LOrExpAST::DumpKoopa() const {
 
 string LValAST::DumpKoopa() const {
     ostringstream oss;
-    oss<<"\t%"<<NAME_NUMBER++<<"= add 0, "<<Calc()<<endl;
+    if(!HasName(VAL_MAP,name)){
+        cerr<<"不存在的变量名"<<endl;
+        cerr<<"现在的变量名为\""<<name<<"\""<<endl;
+
+        assert(0);
+    }
+    symboltype rslt = GetLvalValue(VAL_MAP,name);
+    if(rslt.type==ValType::Const){
+        oss<<"\t%"<<NAME_NUMBER++<<"= add 0, "<<Calc()<<endl;
+    }
+    else{
+        oss<<"\t%"<<NAME_NUMBER++<<"= load @"<<name<<endl;
+    }
+
+    return oss.str();
+}
+
+
+string VarDefAST::DumpKoopa() const {
+    ostringstream oss;
+    //一定是int
+    oss<<"\t@"<<name<<" = alloc i32"<<endl;
+    unordered_map<string,symboltype>& lastMap = VAL_MAP.back();
+    if(value!= nullptr){
+
+        // 输出表达式的koopa
+        oss<<value->DumpKoopa();
+
+        oss<<"\tstore %"<<NAME_NUMBER-1<<", @"<<name<<endl;
+        //将变量的字符存入表中
+        symboltype valstruct = {-7777777,ValType::Var};
+        lastMap[name] = valstruct;
+    }
+    else{
+        //默认值，用于报警
+        symboltype valstruct = {-7777777,ValType::Var};
+        lastMap[name] = valstruct;
+    }
+    if(next!= nullptr)
+        oss<<next->DumpKoopa();
+    return oss.str();
+}
+
+string LEVal::DumpKoopa() const {
+    // 检查有没有这个变量
+    assert(HasName(VAL_MAP,name));
+
+    //不用存值，直接输出koopa
+    ostringstream oss;
+    oss<<"\tstore %"<<NAME_NUMBER-1<<", @"<<name<<endl;
     return oss.str();
 }

@@ -124,7 +124,7 @@ public:
 
     bool Is_LVal;
     std::unique_ptr <BaseAST> num;
-    std::unique_ptr<BaseAST> lvalname;
+    std::unique_ptr <BaseAST> name;
 
     StmtAST(std::unique_ptr <BaseAST> &_ret_num) {
         num = std::move(_ret_num);
@@ -133,7 +133,7 @@ public:
 
     StmtAST(point<BaseAST>& _num,point<BaseAST>& _lvalname){
         num = std::move(_num);
-        lvalname = std::move(_lvalname);
+        name = std::move(_lvalname);
         Is_LVal= true;
     }
     std::string DumpAST() const override;
@@ -465,14 +465,53 @@ public:
 class LValAST :public BaseAST{
 public:
     string name;
-    LValAST(string _name):name(_name){
-        ;
+    bool Is_Const;
+    LValAST(string _name){
+        name = _name;
+    }
+
+    //设置属性
+    void SetIsConst(bool _is_const){
+        Is_Const=_is_const;
     }
 
     int Calc() const override{
-        return GetLvalValue(CONSTVAL_MAP,name);
+        symboltype reslt= GetLvalValue(VAL_MAP,name);
+        //存入的应该是const
+        assert(reslt.type==ValType::Const);
+        return reslt.num;
     }
 
     string DumpKoopa() const override;
 };
 
+class VarDefAST:public BaseAST{
+public:
+    string name;
+    point<BaseAST> value;
+    point<BaseAST> next;
+
+    VarDefAST(string _name, point<BaseAST>& _value){
+        name = _name;
+        value = std::move(_value);
+    }
+    VarDefAST(string _name){
+        name = _name;
+    }
+    void AddItem(point<BaseAST>& _next){
+        next = std::move(_next);
+    }
+
+
+    string DumpKoopa() const override;
+};
+
+
+class LEVal :public BaseAST{
+public:
+    string name;
+    LEVal(string _name):name(_name){
+        ;
+    }
+    string  DumpKoopa() const override;
+};

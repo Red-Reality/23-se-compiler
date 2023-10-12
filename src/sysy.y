@@ -30,7 +30,8 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
     int int_val;
     BaseAST *ast_val;
     BlockItemAST *blk_val;
-    ConstDefAST* cdf_val;
+    ConstDefAST *cdf_val;
+    VarDefAST *vdf_val;
 }
 
 // lexer 返回的所有 token 种类的声明
@@ -42,10 +43,11 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt Number
                 Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
-                Decl LVal  ConstInitVal ConstExp
+                Decl LVal  ConstInitVal ConstExp InitVal LEVal
 
 %type <blk_val> BlockItemList BlockItem
 %type <cdf_val> ConstDefList ConstDef ConstDecl
+%type <vdf_val> VarDecl VarDefList VarDef
 
 %%
 
@@ -110,30 +112,70 @@ Stmt
         auto exp = std::unique_ptr<BaseAST>($2);
         $$ = new StmtAST(exp);
     }
-    | LVal '=' Exp ';'{
+    | LEVal '=' Exp ';'{
         auto lval = std::unique_ptr<BaseAST>($1);
         auto exp = std::unique_ptr<BaseAST>($3);
         $$ = new StmtAST(exp,lval);
     }
     ;
+LEVal
+    : IDENT{
+        auto name = point<string>($1);
+        $$ = new LEVal(name->c_str());
+    };
+
 Decl
     : ConstDecl{
         auto cd = point<BaseAST>($1);
         $$ = new DeclAST(cd,1);
     }
+    | VarDecl{
+        auto vd = point<BaseAST>($1);
+        $$ = new DeclAST(vd,0);
+    }
     ;
+VarDecl
+    : INT VarDefList ';'{
+        $$ = $2;
+    }
+
+VarDefList
+    : VarDef{
+        $$ = $1;
+    }
+    | VarDef ',' VarDefList{
+        auto list = point<BaseAST>($3);
+        $1->AddItem(list);
+        $$ = $1;
+    }
+    ;
+
+VarDef
+    : IDENT{
+        auto name = std::unique_ptr<std::string>($1);
+        $$ = new VarDefAST(name->c_str());
+    }
+    | IDENT '=' InitVal{
+        auto name = std::unique_ptr<std::string>($1);
+        auto initval = point<BaseAST>($3);
+        $$ = new VarDefAST(name->c_str(),initval);
+    }
+    ;
+
+InitVal:Exp;
 
 ConstDecl
     : CONST INT ConstDefList ';'{
         $$ = $3;
     }
+    ;
 ConstDefList
     :ConstDef{
         $$ = $1;
     }
-    | ',' ConstDef ConstDefList{
-        $$ = $3;
-        auto cd = point<ConstDefAST>($2);
+    | ConstDefList ',' ConstDef{
+        $$ = $1;
+        auto cd = point<ConstDefAST>($3);
         $$->AddItem(cd);
     }
     ;
@@ -148,8 +190,8 @@ ConstInitVal : ConstExp;
 ConstExp : Exp;
 LVal
     :IDENT{
-        string name =*($1);
-        $$ = new LValAST(name);
+        auto name = point<string>($1);
+        $$ = new LValAST(name->c_str());
     }
     ;
 
