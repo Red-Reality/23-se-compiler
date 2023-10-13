@@ -1,6 +1,8 @@
 //
 // Created by leon on 2023/10/3.
 //
+
+/// TODO:重写生成，把map归一成<value_t,int>
 #include "koopa.h"
 #include <iostream>
 #include "sstream"
@@ -9,13 +11,12 @@
 #include "iomanip"
 #include "createRiscV.h"
 
+
 using namespace std;
-#define MAXREG 13
-//指向下一个可用的寄存器，范围是0-12
-static int REG_NUMBER = 0;
-typedef unsigned long long ull;
+
+
 //ull代表的是tag==binary和tag==integer的rawvalue的地址,int是存放的 REG_NUMBER
-map<ull, int> value_reg_map;
+//map<ull, int> value_reg_map;
 
 // 输出寄存器号码
 string pri_reg_name(int regnum) {
@@ -36,26 +37,6 @@ string pri_reg_name(int regnum) {
     }
 }
 
-// 在pa3中，暂时不考虑临时寄存器用完的问题
-/// 将值存入map中的函数，返回需要输出的riscv语句
-string set_value_in_register(koopa_raw_value_t l) {
-    ostringstream oss;
-    if (l->kind.tag == KOOPA_RVT_INTEGER) {
-        //如果是0，那么用x0代表这个寄存器
-        if (l->kind.data.integer.value == 0) {
-            value_reg_map[(ull) l] = -1;
-            return "";
-        } else {
-            value_reg_map[(ull) l] = REG_NUMBER;
-            oss << "\tli  " << pri_reg_name(REG_NUMBER) << ", " << l->kind.data.integer.value << endl;
-            return oss.str();
-        }
-
-    }
-    return "";
-
-
-}
 
 void parse_string(const char *str) {
 
@@ -83,8 +64,21 @@ void parse_string(const char *str) {
         //排除掉第一个@号
         cout << func->name + 1 << ":" << endl;
 
+        // 为函数申请特别大的栈空间存
+        // 每个语句都可以分到一个4字节空间（无论他用不用)
+        int length = 0;
+        for (size_t tmp = 0; tmp < func->bbs.len; tmp++) {
+            koopa_raw_basic_block_t bb = (koopa_raw_basic_block_t) func->bbs.buffer[tmp];
+            length += bb->insts.len;
+        }
+        cout << "\taddi sp, sp, -" << length * 4 << endl;
         for (size_t j = 0; j < func->bbs.len; ++j) {
             assert(func->bbs.kind == KOOPA_RSIK_BASIC_BLOCK);
+
+            // 符号表，当前变量存在栈上
+            unordered_map<ull, int> sympol_map;
+            // 迭代器，指示当前栈没有数的最小偏移量
+            int stackIt = 0;
             koopa_raw_basic_block_t bb = (koopa_raw_basic_block_t) func->bbs.buffer[j];
             for (size_t k = 0; k < bb->insts.len; ++k) {
                 koopa_raw_value_t value = (koopa_raw_value_t) bb->insts.buffer[k];
@@ -97,32 +91,45 @@ void parse_string(const char *str) {
 //                    cerr << "lh:" << value->kind.data.binary.lhs->kind.data.integer.value << "\top:"
 //                         << value->kind.data.binary.op << "\trhs:"
 //                         << value->kind.data.binary.rhs->kind.data.integer.value << endl;
-                    Visit(value->kind.data.binary);
+                    Visit(value->kind.data.binary, sympol_map, stackIt);
                 } else if (value->kind.tag == KOOPA_RVT_RETURN) {
-                    //这部分之后还要改，暂时用特例写死,认为ret的上一步的寄存器一定是上一个
+                    //这部分之后还要改，暂时用特例写死,认为ret的数据一定存在栈底
+                    cout << "\tlw a0, " << stackIt - 4 << "(sp)" << endl;
+                    //恢复现场
+                    cout << "\taddi sp, sp, " << length * 4 << endl;
+                    cout << "\tret" << endl;
 
-                    cout << "\t" << left << setw(6) << "mv" << "a0," << pri_reg_name((REG_NUMBER + MAXREG - 1) % MAXREG)
-                         << endl;
-                    cout<<"\tret"<<endl;
+                } else if (value->kind.tag == KOOPA_RVT_STORE) {
+                    // 处理store语句和alloc语句
+                    Visit(value->kind.data.store, sympol_map, stackIt);
+                } else if (value->kind.tag == KOOPA_RVT_LOAD) {
+                    // 把该语句指向load的语句的栈偏移量
+//                    if(value->kind.data.load.src->kind.tag==KOOPA_RVT_BINARY){
+//                        sympol_map[(ull) value] = sympol_map[(ull)(&value->kind.data.load.src->kind.data.binary)];
+//                        cerr << "load addr(binary):" << (ull)(&value->kind.data.binary) << ", stit:" << sympol_map[(ull) value] << endl;
+//
+//                    }
+//                    else{
+                        sympol_map[(ull) value] = sympol_map[(ull) value->kind.data.load.src];
+                        cerr << "load addr(value):" << (ull) value << ", stit:" << sympol_map[(ull) value] << endl;
+                        cerr<<"load addr(value) detail: src="<<(ull)value->kind.data.load.src<<", its stit = "<<sympol_map[(ull) value->kind.data.load.src]<<endl;
+                        cerr<<"src's type is: "<<value->kind.tag<<endl;
+//                    }
 
+
+
+                } else if (value->kind.tag == KOOPA_RVT_ALLOC) {
+                    //不处理，store的时候才真的存这个数
+                    continue;
+                } else {
+                    cerr << "unexpected statement, type is: " << value->kind.tag << endl;
+                    assert(0);
                 }
-                // 示例程序中, 你得到的 value 一定是一条 return 指令
-                //assert(value->kind.tag == KOOPA_RVT_RETURN);
-                // 于是我们可以按照处理 return 指令的方式处理这个 value
-                // return 指令中, value 代表返回值
-                //koopa_raw_value_t ret_value = value->kind.data.ret.value;
-                // 示例程序中, ret_value 一定是一个 integer
-                //assert(ret_value->kind.tag == KOOPA_RVT_INTEGER);
-                // 于是我们可以按照处理 integer 的方式处理 ret_value
-                // integer 中, value 代表整数的数值
-                //int32_t int_val = ret_value->kind.data.integer.value;
-                // 示例程序中, 这个数值一定是 0
-                //assert(int_val == 0);
-                //cout<<"   li "<<"a0 , "<<int_val<<endl;
-                //cout<<"   ret"<<endl;
+
             }
             // ...
         }
+
         // ...
     }
 
@@ -153,62 +160,64 @@ void pri_riscv_bin_order(const char *order, int ordernum, int reg1, int reg2 = -
 
 //处理表达式
 //要处理的是lhs,rhs,op
-void Visit(const koopa_raw_binary_t &oper) {
-    //首先获取lhs，rhs
-    //如果是立即数，就存入寄存器里
-    //注意，可能存在过深的调用导致覆盖了寄存器导致出错，但pa3暂时不考虑
-    //clog << "start Visit" << endl;
+void Visit(const koopa_raw_binary_t &oper, unordered_map<ull, int> &value_reg_map, int &stit) {
 
-    int lhsreg = -2, rhsreg = -2;
+    // 左表达式就存在t0，右表达式就存在t1
+    // 如果是0的话就取x0
+    int lhsreg = 0, rhsreg = 1;
+
     if (oper.lhs->kind.tag == KOOPA_RVT_INTEGER) {
         //如果是0就用x0寄存器
         if (oper.lhs->kind.data.integer.value == 0) {
-            value_reg_map[(ull) oper.lhs] = -1;
+            lhsreg = -1;
         } else {
-            //申请一个寄存器
-            cout << '\t' << setw(6) << "li " << pri_reg_name(REG_NUMBER) << ", " << oper.lhs->kind.data.integer.value
+            //调出立即值，不需要存栈里面
+            cout << '\t' << setw(6) << "li " << pri_reg_name(lhsreg) << ", " << oper.lhs->kind.data.integer.value
                  << endl;
-            value_reg_map[(ull) oper.lhs] = REG_NUMBER;
-            REG_NUMBER = (REG_NUMBER + 1) % MAXREG;
         }
 
-        lhsreg = value_reg_map[(ull) oper.lhs];
-
-    } else if (oper.lhs->kind.tag == KOOPA_RVT_BINARY) {
-        //如果是表达式，取binary_t的地址来找出用的寄存器
-        lhsreg = value_reg_map[(ull) (&oper.lhs->kind.data.binary)];
+    } else {
+        //assert(value_reg_map.find(((ull)&oper.lhs->kind.data.binary))!=value_reg_map.end());
+        //如果是表达式，取出栈上保存的值放入t0，不会用到其他寄存器
+        cerr << "load lhs addr:" << (ull)  (oper.lhs) << ", stit="
+             << value_reg_map[(ull) (oper.lhs)] << endl;
+        cerr<<"lhs addr is"<<(ull)(oper.lhs)<<endl;
+        cout << "\tlw t0," << value_reg_map[(ull) (oper.lhs)]  << "(sp)" << endl;
     }
     if (oper.rhs->kind.tag == KOOPA_RVT_INTEGER) {
         if (oper.rhs->kind.data.integer.value == 0) {
-            value_reg_map[(ull) oper.rhs] = -1;
+            rhsreg = -1;
         } else {
-            cout << '\t' << left << setw(6) << "li " << pri_reg_name(REG_NUMBER) << ", "
+            cout << '\t' << left << setw(6) << "li " << pri_reg_name(rhsreg) << ", "
                  << oper.rhs->kind.data.integer.value
                  << endl;
-            value_reg_map[(ull) oper.rhs] = REG_NUMBER;
-            REG_NUMBER = (REG_NUMBER + 1) % MAXREG;
         }
-        rhsreg = value_reg_map[(ull) oper.rhs];
-    } else if (oper.rhs->kind.tag == KOOPA_RVT_BINARY) {
-        rhsreg = value_reg_map[(ull) (&oper.rhs->kind.data.binary)];
+    } else {
+        assert(value_reg_map.find(((ull)&oper.lhs->kind.data.binary))!=value_reg_map.end());
+        //如果是表达式，取出栈上保存的值放入t1，不会用到其他寄存器
+        cerr << "load rhs addr:" << (ull) (oper.rhs) << ", stit="
+             << value_reg_map[(ull) (oper.rhs)] << endl;
+        cout << "\tlw t1," << value_reg_map[(ull)  (oper.rhs)] << "(sp)" << endl;
     }
-    //在pa3中不应该存在其他可能
-    assert(lhsreg != -2);
-    assert(rhsreg != -2);
+//    //在pa3中不应该存在其他可能
+//    assert(lhsreg != -2);
+//    assert(rhsreg != -2);
 
+    // 存放结果的地方默认在t2
+    const int REG_NUMBER = 2;
     //现在找到了两个数的寄存器
     //然后分类处理不同的运算符输出的不同的riscv语句
     switch (oper.op) {
         case koopa_raw_binary_op::KOOPA_RBO_NOT_EQ:
             //暂时只能解决表达式相等（实现了减法的值）
-            pri_riscv_bin_order("sub",3,REG_NUMBER,lhsreg,rhsreg);
-            pri_riscv_bin_order("snez",2,REG_NUMBER,REG_NUMBER);
+            pri_riscv_bin_order("sub", 3, REG_NUMBER, lhsreg, rhsreg);
+            pri_riscv_bin_order("snez", 2, REG_NUMBER, REG_NUMBER);
 
             break;
         case koopa_raw_binary_op::KOOPA_RBO_EQ:
             //暂时只能解决表达式相等（实现了减法的值）
-            pri_riscv_bin_order("sub",3,REG_NUMBER,lhsreg,rhsreg);
-            pri_riscv_bin_order("seqz",2,REG_NUMBER,REG_NUMBER);
+            pri_riscv_bin_order("sub", 3, REG_NUMBER, lhsreg, rhsreg);
+            pri_riscv_bin_order("seqz", 2, REG_NUMBER, REG_NUMBER);
             break;
         case koopa_raw_binary_op::KOOPA_RBO_GT:
             pri_riscv_bin_order("sgt", 3, REG_NUMBER, lhsreg, rhsreg);
@@ -260,9 +269,36 @@ void Visit(const koopa_raw_binary_t &oper) {
             assert(0);
 
     }
-    //存储表达式结果至下一个寄存器中,用地址映射
-    value_reg_map[(ull) (&oper)] = REG_NUMBER;
-    REG_NUMBER = (REG_NUMBER + 1) % MAXREG;
+    // 把结果存入map中记录
 
-    //clog << "end Visit" << endl;
+    cout << "\tsw " << pri_reg_name(REG_NUMBER) << ", " << stit << "(sp)" << endl;
+    value_reg_map[(ull) &oper] = stit;
+    cerr << "oper addr=" << (ull) &oper << ", stackit= " << stit << endl;
+    stit += 4;
+}
+
+void Visit(const koopa_raw_store_t &SaveObj, unordered_map<ull, int> &mymap, int &stit) {
+    koopa_raw_value_t value = SaveObj.value;
+    koopa_raw_value_t dest = SaveObj.dest;
+
+    // 先看value，如果是立即数就直接赋值到t0
+    // 如果是表达式就取出值
+    if (value->kind.tag == KOOPA_RVT_INTEGER) {
+        cout << "\tli t0, " << value->kind.data.integer.value << endl;
+    } else if (value->kind.tag == KOOPA_RVT_BINARY) {
+        assert(mymap.find((ull) &(value->kind.data.binary))!=mymap.end());
+        cout << "\tlw t0, " << mymap[(ull) &(value->kind.data.binary)] << "(sp)" << endl;
+    } else {
+        cerr << "unexpected type,type tag is:" << value->kind.tag << endl;
+        assert(0);
+    }
+
+    //检查dest,看看有没有已经为他分配一个空间
+    // 如果没有，就申请一片空间
+    if (mymap.find((ull) dest) == mymap.end()) {
+        mymap[(ull) dest] = stit;
+        stit += 4;
+    }
+    cerr << "store addr=" << (ull) dest << ", stackit= " << mymap[(ull) dest] << endl;
+    cout << "\tsw t0, " << mymap[(ull) dest] << "(sp)" << endl;
 }

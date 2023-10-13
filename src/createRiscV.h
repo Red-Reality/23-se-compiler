@@ -9,8 +9,13 @@
 #pragma once
 #include "string"
 #include "koopa.h"
+#include <unordered_map>
 using namespace std;
+typedef unsigned long long ull;
 //读取Koopa程序字符串生产IR内存
 void parse_string(const char* str);
 //处理二元表达式
-void Visit(const koopa_raw_binary_t& oper);
+void Visit(const koopa_raw_binary_t &oper, unordered_map<ull, int> &value_reg_map, int& stit);
+
+// 处理store语句
+void Visit(const koopa_raw_store_t& SaveObj,unordered_map<ull,int>& mymap,int& stit);
