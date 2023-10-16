@@ -3,6 +3,7 @@
     #include <string>
     #include<cstring>
     #include "ast.hpp"
+    #include "IfElseAst.hpp"
 }
 
 %{
@@ -12,6 +13,7 @@
 #include <string>
 #include<cstring>
 #include "ast.hpp"
+#include "IfElseAst.hpp"
 
 // 声明 lexer 函数和错误处理函数
 int yylex();
@@ -36,14 +38,14 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN CONST
+%token INT RETURN CONST IF ELSE
 %token <str_val> IDENT LOR LAND EQ NEQ GEQ LEQ
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt Number
                 Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
-                Decl LVal  ConstInitVal ConstExp InitVal LEVal
+                Decl LVal  ConstInitVal ConstExp InitVal LEVal FinalStmt NotFinalStmt
 
 %type <blk_val> BlockItemList BlockItem
 %type <cdf_val> ConstDefList ConstDef ConstDecl
@@ -109,9 +111,9 @@ BlockItem
         $$ = new BlockItemAST(stmt);
     }
 
-
-
-Stmt
+// 把stmt 拆成后续没有嵌套的stmt和有嵌套的stmt,FinalStmt是所有后面不出现else的stmt，NotFinalStmt是可以在后面出现else的stmt
+Stmt : FinalStmt|NotFinalStmt;
+FinalStmt
     : RETURN Exp ';' {
         auto exp = std::unique_ptr<BaseAST>($2);
         $$ = new StmtAST(exp);
@@ -138,7 +140,29 @@ Stmt
         stmt->type = StmtType::NoExp;
         $$ = stmt;
     }
+    | IF '(' Exp ')' FinalStmt ELSE FinalStmt{
+        auto ast = new IfElseAST();
+        ast->sequence = point<BaseAST>($3);
+        ast->ifexp = point<BaseAST>($5);
+        ast->elseexp = point<BaseAST>($7);
+        $$ = ast;
+    }
     ;
+
+NotFinalStmt
+    : IF '(' Exp ')' Stmt{
+        auto ast = new IfElseAST();
+        ast->sequence = point<BaseAST>($3);
+        ast->ifexp = point<BaseAST>($5);
+        $$ = ast;
+    }
+    | IF '(' Exp ')' FinalStmt ELSE NotFinalStmt{
+        auto ast = new IfElseAST();
+        ast->sequence = point<BaseAST>($3);
+        ast->ifexp = point<BaseAST>($5);
+        ast->elseexp = point<BaseAST>($7);
+        $$ = ast;
+    }
 LEVal
     : IDENT{
         auto name = point<string>($1);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GlobalVar.h"
 #include <memory>
 #include <string>
 #include <iostream>
@@ -11,9 +12,7 @@
 using namespace std;
 // 所有 AST 的基类
 
-/// 用于记录当前寄存器用到几号
-/// %NAME_NUMBER 意思是下一个空着的变量符而不是最后一个已用的变量
-static int NAME_NUMBER = 0;
+
 //简化智能指针
 template<typename T>
 using point = std::unique_ptr<T>;
