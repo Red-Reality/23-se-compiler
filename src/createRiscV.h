@@ -15,7 +15,7 @@ typedef unsigned long long ull;
 //读取Koopa程序字符串生产IR内存
 void parse_string(const char* str);
 //处理二元表达式
-void Visit(const koopa_raw_binary_t &oper, unordered_map<ull, int> &value_reg_map, int& stit);
+void BinVisit(const koopa_raw_value_t &oper, unordered_map<koopa_raw_value_t , int> &value_reg_map, int& stit);
 
 // 处理store语句
-void Visit(const koopa_raw_store_t& SaveObj,unordered_map<ull,int>& mymap,int& stit);
+void StoreVisit(const koopa_raw_value_t& SaveObj,unordered_map<koopa_raw_value_t , int>& mymap,int& stit);

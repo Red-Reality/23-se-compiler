@@ -76,7 +76,7 @@ void parse_string(const char *str) {
             assert(func->bbs.kind == KOOPA_RSIK_BASIC_BLOCK);
 
             // 符号表，当前变量存在栈上
-            unordered_map<ull, int> sympol_map;
+            unordered_map<koopa_raw_value_t , int> sympol_map;
             // 迭代器，指示当前栈没有数的最小偏移量
             int stackIt = 0;
             koopa_raw_basic_block_t bb = (koopa_raw_basic_block_t) func->bbs.buffer[j];
@@ -91,7 +91,7 @@ void parse_string(const char *str) {
 //                    cerr << "lh:" << value->kind.data.binary.lhs->kind.data.integer.value << "\top:"
 //                         << value->kind.data.binary.op << "\trhs:"
 //                         << value->kind.data.binary.rhs->kind.data.integer.value << endl;
-                    Visit(value->kind.data.binary, sympol_map, stackIt);
+                    BinVisit(value, sympol_map, stackIt);
                 } else if (value->kind.tag == KOOPA_RVT_RETURN) {
                     //这部分之后还要改，暂时用特例写死,认为ret的数据一定存在栈底
                     cout << "\tlw a0, " << stackIt - 4 << "(sp)" << endl;
@@ -101,20 +101,14 @@ void parse_string(const char *str) {
 
                 } else if (value->kind.tag == KOOPA_RVT_STORE) {
                     // 处理store语句和alloc语句
-                    Visit(value->kind.data.store, sympol_map, stackIt);
+                    StoreVisit(value, sympol_map, stackIt);
                 } else if (value->kind.tag == KOOPA_RVT_LOAD) {
                     // 把该语句指向load的语句的栈偏移量
-//                    if(value->kind.data.load.src->kind.tag==KOOPA_RVT_BINARY){
-//                        sympol_map[(ull) value] = sympol_map[(ull)(&value->kind.data.load.src->kind.data.binary)];
-//                        cerr << "load addr(binary):" << (ull)(&value->kind.data.binary) << ", stit:" << sympol_map[(ull) value] << endl;
-//
-//                    }
-//                    else{
-                        sympol_map[(ull) value] = sympol_map[(ull) value->kind.data.load.src];
-                        cerr << "load addr(value):" << (ull) value << ", stit:" << sympol_map[(ull) value] << endl;
-                        cerr<<"load addr(value) detail: src="<<(ull)value->kind.data.load.src<<", its stit = "<<sympol_map[(ull) value->kind.data.load.src]<<endl;
+                        sympol_map[value] = sympol_map[value->kind.data.load.src];
+                        cerr << "load addr(value):" << (ull) value << ", stit:" << sympol_map[value] << endl;
+                        cerr<<"load addr(value) detail: src="<<(ull)value->kind.data.load.src<<", its stit = "<<sympol_map[value->kind.data.load.src]<<endl;
                         cerr<<"src's type is: "<<value->kind.tag<<endl;
-//                    }
+//
 
 
 
@@ -160,10 +154,11 @@ void pri_riscv_bin_order(const char *order, int ordernum, int reg1, int reg2 = -
 
 //处理表达式
 //要处理的是lhs,rhs,op
-void Visit(const koopa_raw_binary_t &oper, unordered_map<ull, int> &value_reg_map, int &stit) {
+void BinVisit(const koopa_raw_value_t &valtmp, unordered_map<koopa_raw_value_t, int> &value_reg_map, int &stit) {
 
     // 左表达式就存在t0，右表达式就存在t1
     // 如果是0的话就取x0
+    koopa_raw_binary_t oper = valtmp->kind.data.binary;
     int lhsreg = 0, rhsreg = 1;
 
     if (oper.lhs->kind.tag == KOOPA_RVT_INTEGER) {
@@ -177,12 +172,12 @@ void Visit(const koopa_raw_binary_t &oper, unordered_map<ull, int> &value_reg_ma
         }
 
     } else {
-        //assert(value_reg_map.find(((ull)&oper.lhs->kind.data.binary))!=value_reg_map.end());
+        assert(value_reg_map.find(oper.lhs)!=value_reg_map.end());
         //如果是表达式，取出栈上保存的值放入t0，不会用到其他寄存器
         cerr << "load lhs addr:" << (ull)  (oper.lhs) << ", stit="
-             << value_reg_map[(ull) (oper.lhs)] << endl;
+             << value_reg_map[oper.lhs] << endl;
         cerr<<"lhs addr is"<<(ull)(oper.lhs)<<endl;
-        cout << "\tlw t0," << value_reg_map[(ull) (oper.lhs)]  << "(sp)" << endl;
+        cout << "\tlw t0," << value_reg_map[oper.lhs]  << "(sp)" << endl;
     }
     if (oper.rhs->kind.tag == KOOPA_RVT_INTEGER) {
         if (oper.rhs->kind.data.integer.value == 0) {
@@ -193,11 +188,11 @@ void Visit(const koopa_raw_binary_t &oper, unordered_map<ull, int> &value_reg_ma
                  << endl;
         }
     } else {
-        assert(value_reg_map.find(((ull)&oper.lhs->kind.data.binary))!=value_reg_map.end());
+        assert(value_reg_map.find(oper.rhs)!=value_reg_map.end());
         //如果是表达式，取出栈上保存的值放入t1，不会用到其他寄存器
         cerr << "load rhs addr:" << (ull) (oper.rhs) << ", stit="
-             << value_reg_map[(ull) (oper.rhs)] << endl;
-        cout << "\tlw t1," << value_reg_map[(ull)  (oper.rhs)] << "(sp)" << endl;
+             << value_reg_map[oper.rhs] << endl;
+        cout << "\tlw t1," << value_reg_map[oper.rhs] << "(sp)" << endl;
     }
 //    //在pa3中不应该存在其他可能
 //    assert(lhsreg != -2);
@@ -272,12 +267,13 @@ void Visit(const koopa_raw_binary_t &oper, unordered_map<ull, int> &value_reg_ma
     // 把结果存入map中记录
 
     cout << "\tsw " << pri_reg_name(REG_NUMBER) << ", " << stit << "(sp)" << endl;
-    value_reg_map[(ull) &oper] = stit;
-    cerr << "oper addr=" << (ull) &oper << ", stackit= " << stit << endl;
+    value_reg_map[valtmp] = stit;
+//    cerr << "oper addr=" << (ull) &valtmp << ", stackit= " << stit << endl;
     stit += 4;
 }
 
-void Visit(const koopa_raw_store_t &SaveObj, unordered_map<ull, int> &mymap, int &stit) {
+void StoreVisit(const koopa_raw_value_t &obj, unordered_map<koopa_raw_value_t, int> &mymap, int &stit) {
+    koopa_raw_store_t SaveObj = obj->kind.data.store;
     koopa_raw_value_t value = SaveObj.value;
     koopa_raw_value_t dest = SaveObj.dest;
 
@@ -286,8 +282,8 @@ void Visit(const koopa_raw_store_t &SaveObj, unordered_map<ull, int> &mymap, int
     if (value->kind.tag == KOOPA_RVT_INTEGER) {
         cout << "\tli t0, " << value->kind.data.integer.value << endl;
     } else if (value->kind.tag == KOOPA_RVT_BINARY) {
-        assert(mymap.find((ull) &(value->kind.data.binary))!=mymap.end());
-        cout << "\tlw t0, " << mymap[(ull) &(value->kind.data.binary)] << "(sp)" << endl;
+        assert(mymap.find(value)!=mymap.end());
+        cout << "\tlw t0, " << mymap[value] << "(sp)" << endl;
     } else {
         cerr << "unexpected type,type tag is:" << value->kind.tag << endl;
         assert(0);
@@ -295,10 +291,10 @@ void Visit(const koopa_raw_store_t &SaveObj, unordered_map<ull, int> &mymap, int
 
     //检查dest,看看有没有已经为他分配一个空间
     // 如果没有，就申请一片空间
-    if (mymap.find((ull) dest) == mymap.end()) {
-        mymap[(ull) dest] = stit;
+    if (mymap.find(dest) == mymap.end()) {
+        mymap[dest] = stit;
         stit += 4;
     }
-    cerr << "store addr=" << (ull) dest << ", stackit= " << mymap[(ull) dest] << endl;
-    cout << "\tsw t0, " << mymap[(ull) dest] << "(sp)" << endl;
+//    cerr << "store addr=" << (ull) dest << ", stackit= " << mymap[dest] << endl;
+    cout << "\tsw t0, " << mymap[dest] << "(sp)" << endl;
 }
