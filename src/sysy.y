@@ -83,6 +83,10 @@ Block
         auto stmt = std::unique_ptr<BaseAST>($2);
         $$ = new BlockAST(stmt);
     }
+    | '{' '}'{
+        auto ast = new BlockAST();
+        $$ = ast;
+    }
     ;
 BlockItemList
     : BlockItem{
@@ -117,12 +121,30 @@ Stmt
         auto exp = std::unique_ptr<BaseAST>($3);
         $$ = new StmtAST(exp,lval);
     }
+    | Block{
+        auto stmt = new StmtAST();
+        stmt->type = StmtType::BlockStmt;
+        stmt->num = std::unique_ptr<BaseAST>($1);
+        $$ = stmt;
+    }
+    | Exp ';'{
+        auto stmt = new StmtAST();
+        stmt->type = StmtType::OneExp;
+        stmt->num = std::unique_ptr<BaseAST>($1);
+        $$ = stmt;
+    }
+    | ';'{
+        auto stmt = new StmtAST();
+        stmt->type = StmtType::NoExp;
+        $$ = stmt;
+    }
     ;
 LEVal
     : IDENT{
         auto name = point<string>($1);
         $$ = new LEVal(name->c_str());
     };
+
 
 Decl
     : ConstDecl{

@@ -90,7 +90,9 @@ public:
         stmt = std::move(_stmt);
     }
 
-
+    BlockAST(){
+        ;
+    }
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
@@ -119,22 +121,36 @@ public:
     std::string DumpKoopa() const override;
 };
 
+enum class  StmtType{
+    ReturnStmt,
+    LValEqStmt,
+    BlockStmt,
+    OneExp,
+    NoExp
+};
 class StmtAST : public BaseAST {
 public:
 
     bool Is_LVal;
     std::unique_ptr <BaseAST> num;
     std::unique_ptr <BaseAST> name;
+    StmtType type;
 
     StmtAST(std::unique_ptr <BaseAST> &_ret_num) {
         num = std::move(_ret_num);
         Is_LVal= false;
+        type=StmtType::ReturnStmt;
     }
 
     StmtAST(point<BaseAST>& _num,point<BaseAST>& _lvalname){
         num = std::move(_num);
         name = std::move(_lvalname);
         Is_LVal= true;
+        type = StmtType::LValEqStmt;
+    }
+
+    StmtAST(){
+        ;
     }
     std::string DumpAST() const override;
 

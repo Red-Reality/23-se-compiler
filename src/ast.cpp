@@ -6,15 +6,33 @@
 #include "ast.hpp"
 #include <string>
 #include "sstream"
+
 using namespace std;
 
+int retValDepth(string name) {
+    int depth = VAL_MAP.size();
+    for (auto it = VAL_MAP.rbegin(); it != VAL_MAP.rend(); it++) {
+        unordered_map <string, symboltype> &tmpmap = *it;
+        if (tmpmap.find(name) != tmpmap.end()) {
+            break;
+        } else {
+            depth--;
+        }
+    }
+    if (depth <= 0) {
+        warnerror(VAL_MAP, name);
+    }
+    return depth;
+}
+
 //格式化生成运算式
-std::string generate_binary_operation(int leftnum,int rightnum,string oper){
+std::string generate_binary_operation(int leftnum, int rightnum, string oper) {
     ostringstream tmp;
-    tmp<< "\t%"<<NAME_NUMBER<<" = "<<oper<<" %"<<leftnum<<", %"<<rightnum<<endl;
+    tmp << "\t%" << NAME_NUMBER << " = " << oper << " %" << leftnum << ", %" << rightnum << endl;
     NAME_NUMBER++;
     return tmp.str();
 }
+
 std::string CompUnitAST::DumpAST() const {
     return "CompUnitAST { \n" + func_def->DumpAST() + "}";
 }
@@ -28,7 +46,15 @@ std::string FuncDefAST::DumpAST() const {
 }
 
 std::string FuncDefAST::DumpKoopa() const {
-    return "fun @" + ident + "():" + func_type->DumpKoopa() + "{\n" + block->DumpKoopa() + "\n}";
+    ostringstream oss;
+    oss << "fun @" << ident << "():" << func_type->DumpKoopa() << "{\n" << "%entry:\n" << block->DumpKoopa();
+    //有寄存器用了
+    if (NAME_NUMBER > 0) {
+        oss << "\tret %" << NAME_NUMBER - 1 ;
+    }
+    oss<< "\n}";
+
+    return oss.str();
 }
 
 std::string FuncTypeAST::DumpAST() const {
@@ -48,16 +74,20 @@ std::string BlockAST::DumpAST() const {
 
 std::string BlockItemAST::DumpKoopa() const {
     ostringstream oss;
-    oss<<stmt->DumpKoopa();
+    if (stmt != nullptr)
+        oss << stmt->DumpKoopa();
 
-    if(next!= nullptr)
-        oss<<next->DumpKoopa();
+    if (next != nullptr)
+        oss << next->DumpKoopa();
     return oss.str();
 }
-std::string BlockAST::DumpKoopa() const {
-    VAL_MAP.push_back(unordered_map<string,symboltype>());
 
-    string rslt = "%entry:\n" + stmt->DumpKoopa();
+std::string BlockAST::DumpKoopa() const {
+    VAL_MAP.push_back(unordered_map<string, symboltype>());
+
+    string rslt = "";
+    if (stmt != nullptr)
+        rslt += stmt->DumpKoopa();
     VAL_MAP.pop_back();
 
     return rslt;
@@ -68,18 +98,26 @@ std::string StmtAST::DumpAST() const {
 }
 
 std::string StmtAST::DumpKoopa() const {
-    if(!Is_LVal)
-        return num->DumpKoopa()+"\tret %"+ to_string(NAME_NUMBER-1);
-    else{
-        ostringstream oss;
-       //求值
-       oss<<num->DumpKoopa();
+    ostringstream oss;
+    if (type == StmtType::LValEqStmt || type == StmtType::ReturnStmt) {
+        if (!Is_LVal)
+            return num->DumpKoopa();
+        else {
 
-       //存储
-       oss<<name->DumpKoopa();
+            //求值
+            oss << num->DumpKoopa();
 
-       return oss.str();
+            //存储
+            oss << name->DumpKoopa();
+
+            return oss.str();
+        }
+    } else if(type==StmtType::BlockStmt){
+        oss<<num->DumpKoopa();
+        return oss.str();
     }
+    return "";
+
 }
 
 std::string DeclAST::DumpKoopa() const {
@@ -88,11 +126,11 @@ std::string DeclAST::DumpKoopa() const {
     return decl->DumpKoopa();
 }
 
-std::string ConstDefAST::DumpKoopa() const{
-    unordered_map<string,symboltype>& lastMap = VAL_MAP.back();
-    symboltype record ={exp->Calc(),ValType::Const};
+std::string ConstDefAST::DumpKoopa() const {
+    unordered_map <string, symboltype> &lastMap = VAL_MAP.back();
+    symboltype record = {exp->Calc(), ValType::Const};
     lastMap[name] = record;
-    if(next!= nullptr)
+    if (next != nullptr)
         next->DumpKoopa();
     return "";
 }
@@ -104,7 +142,7 @@ std::string NumberAST::DumpAST() const {
 
 std::string NumberAST::DumpKoopa() const {
     //cout<<"Number:"<<NAME_NUMBER<<endl;
-    return "\t%"+to_string(NAME_NUMBER++) +"= add 0, "+to_string(val)+"\n";
+    return "\t%" + to_string(NAME_NUMBER++) + "= add 0, " + to_string(val) + "\n";
 }
 
 std::string ExpAST::DumpAST() const {
@@ -116,7 +154,7 @@ std::string ExpAST::DumpKoopa() const {
 }
 
 std::string PrimaryExpAST::DumpAST() const {
-    return "PrimaryExpAST{  \n"+p_exp->DumpAST() +"}";
+    return "PrimaryExpAST{  \n" + p_exp->DumpAST() + "}";
 }
 
 std::string PrimaryExpAST::DumpKoopa() const {
@@ -137,7 +175,7 @@ std::string UnaryExpAST::DumpAST() const {
             break;
     }
 
-    return "UnaryExpAST{  \n"+oper+"("+u_exp->DumpAST()+")}";
+    return "UnaryExpAST{  \n" + oper + "(" + u_exp->DumpAST() + ")}";
 }
 
 std::string UnaryExpAST::DumpKoopa() const {
@@ -146,12 +184,12 @@ std::string UnaryExpAST::DumpKoopa() const {
         case UnaryOp::Positive:
             return u_exp->DumpKoopa();
         case UnaryOp::Negative:
-            rslt += "\t%"+to_string(NAME_NUMBER) +" = sub 0, %"+to_string(NAME_NUMBER-1)+"\n";
+            rslt += "\t%" + to_string(NAME_NUMBER) + " = sub 0, %" + to_string(NAME_NUMBER - 1) + "\n";
             NAME_NUMBER++;
             //cout<<"Negative:"<<NAME_NUMBER<<endl;
             return rslt;
         case UnaryOp::LogicalFalse:
-            rslt += "\t%"+to_string(NAME_NUMBER) +" = eq 0, %"+to_string(NAME_NUMBER-1)+"\n";
+            rslt += "\t%" + to_string(NAME_NUMBER) + " = eq 0, %" + to_string(NAME_NUMBER - 1) + "\n";
             NAME_NUMBER++;
             ///cout<<"LogicalFalse:"<<NAME_NUMBER<<endl;
             return rslt;
@@ -161,14 +199,13 @@ std::string UnaryExpAST::DumpKoopa() const {
 
 std::string MulExpAST::DumpAST() const {
 
-    if(type == MulType::NotMul){
-        return "MulExpAST{  \n"+u_exp->DumpAST()+"}";
-    }
-    else{
+    if (type == MulType::NotMul) {
+        return "MulExpAST{  \n" + u_exp->DumpAST() + "}";
+    } else {
         string oper;
         switch (type) {
             case MulType::Mul:
-                oper="*";
+                oper = "*";
                 break;
             case MulType::Div:
                 oper = "/";
@@ -180,25 +217,24 @@ std::string MulExpAST::DumpAST() const {
                 break;
         }
 
-        return "MulExpAST{  "+m_exp->DumpAST()+"\n"+oper+"\n"+u_exp->DumpAST()+"}";
+        return "MulExpAST{  " + m_exp->DumpAST() + "\n" + oper + "\n" + u_exp->DumpAST() + "}";
 
     }
 }
 
 std::string MulExpAST::DumpKoopa() const {
     ostringstream rslt;
-    if(type==MulType::NotMul){
+    if (type == MulType::NotMul) {
         return u_exp->DumpKoopa();
-    }
-    else{
+    } else {
         rslt << m_exp->DumpKoopa();
-        int leftnum = NAME_NUMBER-1;
-        rslt <<u_exp->DumpKoopa();
-        int rightnum = NAME_NUMBER-1;
+        int leftnum = NAME_NUMBER - 1;
+        rslt << u_exp->DumpKoopa();
+        int rightnum = NAME_NUMBER - 1;
         string oper;
         switch (type) {
             case MulType::Mul:
-                oper="mul";
+                oper = "mul";
                 break;
             case MulType::Div:
                 oper = "div";
@@ -209,7 +245,7 @@ std::string MulExpAST::DumpKoopa() const {
             default:
                 break;
         }
-        rslt<< generate_binary_operation(leftnum,rightnum,oper);
+        rslt << generate_binary_operation(leftnum, rightnum, oper);
 
         return rslt.str();
     }
@@ -218,29 +254,27 @@ std::string MulExpAST::DumpKoopa() const {
 
 std::string AddExpAST::DumpKoopa() const {
     ostringstream reslt;
-    if(type == AddType::NotAdd){
+    if (type == AddType::NotAdd) {
         return m_exp->DumpKoopa();
-    }
-    else{
+    } else {
         string oper;
-        if(type == AddType::Add){
-            oper="add";
-        }
-        else if (type ==AddType::Sub){
+        if (type == AddType::Add) {
+            oper = "add";
+        } else if (type == AddType::Sub) {
             oper = "sub";
         }
-        reslt<<a_exp->DumpKoopa();
-        int leftnum = NAME_NUMBER-1;
-        reslt<<m_exp->DumpKoopa();
-        int rightnum = NAME_NUMBER-1;
-        reslt<< generate_binary_operation(leftnum,rightnum,oper);
+        reslt << a_exp->DumpKoopa();
+        int leftnum = NAME_NUMBER - 1;
+        reslt << m_exp->DumpKoopa();
+        int rightnum = NAME_NUMBER - 1;
+        reslt << generate_binary_operation(leftnum, rightnum, oper);
 
         return reslt.str();
     }
 }
 
 std::string RelExpAST::DumpKoopa() const {
-    string oper= "";
+    string oper = "";
     switch (type) {
         case RelType::Less:
             oper = "lt";
@@ -258,14 +292,14 @@ std::string RelExpAST::DumpKoopa() const {
             break;
     }
     ostringstream reslt;
-    if(type == RelType::NoRel)
+    if (type == RelType::NoRel)
         return a_exp->DumpKoopa();
-    else{
-        reslt<<r_exp->DumpKoopa();
-        int leftnum = NAME_NUMBER-1;
-        reslt<<a_exp->DumpKoopa();
-        int rightnum =NAME_NUMBER-1;
-        reslt<< generate_binary_operation(leftnum,rightnum,oper);
+    else {
+        reslt << r_exp->DumpKoopa();
+        int leftnum = NAME_NUMBER - 1;
+        reslt << a_exp->DumpKoopa();
+        int rightnum = NAME_NUMBER - 1;
+        reslt << generate_binary_operation(leftnum, rightnum, oper);
         return reslt.str();
     }
 }
@@ -284,42 +318,41 @@ std::string EqExpAST::DumpKoopa() const {
             break;
     }
 
-    if (type ==EqType::NoEq){
+    if (type == EqType::NoEq) {
         return r_exp->DumpKoopa();
-    }
-    else{
-        reslt<<e_exp->DumpKoopa();
-        int leftnum = NAME_NUMBER-1;
-        reslt<<r_exp->DumpKoopa();
-        int rightnum =NAME_NUMBER-1;
-        reslt<< generate_binary_operation(leftnum,rightnum,oper);
+    } else {
+        reslt << e_exp->DumpKoopa();
+        int leftnum = NAME_NUMBER - 1;
+        reslt << r_exp->DumpKoopa();
+        int rightnum = NAME_NUMBER - 1;
+        reslt << generate_binary_operation(leftnum, rightnum, oper);
         return reslt.str();
     }
 }
 
 std::string LAndExpAST::DumpKoopa() const {
     ostringstream reslt;
-    if(type==AndOrType::NoLogic)
+    if (type == AndOrType::NoLogic)
         return e_exp->DumpKoopa();
-    else{
-        reslt<<l_exp->DumpKoopa();
-        int leftnum = NAME_NUMBER-1;
-        reslt<<e_exp->DumpKoopa();
-        int rightnum =NAME_NUMBER-1;
+    else {
+        reslt << l_exp->DumpKoopa();
+        int leftnum = NAME_NUMBER - 1;
+        reslt << e_exp->DumpKoopa();
+        int rightnum = NAME_NUMBER - 1;
 
-        reslt<<"\t%"<<NAME_NUMBER<<" = eq 0, %"<<leftnum<<endl;
+        reslt << "\t%" << NAME_NUMBER << " = eq 0, %" << leftnum << endl;
         //下一个leftnum需要更新
-        leftnum = NAME_NUMBER,NAME_NUMBER++;
+        leftnum = NAME_NUMBER, NAME_NUMBER++;
 
-        reslt<<"\t%"<<NAME_NUMBER<<" = eq 0, %"<<rightnum<<endl;
+        reslt << "\t%" << NAME_NUMBER << " = eq 0, %" << rightnum << endl;
         //下一个rightnum需要更新
-        rightnum = NAME_NUMBER,NAME_NUMBER++;
+        rightnum = NAME_NUMBER, NAME_NUMBER++;
 
         //and 说明两个都为真才是真（在这里两个值都为0）
         //所以是left or right取反
 
-        reslt<< generate_binary_operation(leftnum,rightnum,"or");
-        reslt<<"\t%"<<NAME_NUMBER<<" = eq 0, %"<<NAME_NUMBER-1<<endl;
+        reslt << generate_binary_operation(leftnum, rightnum, "or");
+        reslt << "\t%" << NAME_NUMBER << " = eq 0, %" << NAME_NUMBER - 1 << endl;
         NAME_NUMBER++;
 
         return reslt.str();
@@ -328,28 +361,28 @@ std::string LAndExpAST::DumpKoopa() const {
 
 std::string LOrExpAST::DumpKoopa() const {
     ostringstream reslt;
-    if(type==AndOrType::NoLogic)
+    if (type == AndOrType::NoLogic)
         return And_exp->DumpKoopa();
-    else{
-        reslt<<Or_exp->DumpKoopa();
-        int leftnum = NAME_NUMBER-1;
-        reslt<<And_exp->DumpKoopa();
-        int rightnum =NAME_NUMBER-1;
+    else {
+        reslt << Or_exp->DumpKoopa();
+        int leftnum = NAME_NUMBER - 1;
+        reslt << And_exp->DumpKoopa();
+        int rightnum = NAME_NUMBER - 1;
 
         //和0比较取布尔值
-        reslt<<"\t%"<<NAME_NUMBER<<" = eq 0, %"<<leftnum<<endl;
+        reslt << "\t%" << NAME_NUMBER << " = eq 0, %" << leftnum << endl;
         //下一个leftnum需要更新
-        leftnum = NAME_NUMBER,NAME_NUMBER++;
+        leftnum = NAME_NUMBER, NAME_NUMBER++;
 
-        reslt<<"\t%"<<NAME_NUMBER<<" = eq 0, %"<<rightnum<<endl;
+        reslt << "\t%" << NAME_NUMBER << " = eq 0, %" << rightnum << endl;
         //下一个rightnum需要更新
-        rightnum = NAME_NUMBER,NAME_NUMBER++;
+        rightnum = NAME_NUMBER, NAME_NUMBER++;
 
         //or即如果两个都为假（在这里值为1）则假否则为真
         //所以是leftnum and rightnum 然后取反
 
-        reslt<< generate_binary_operation(leftnum,rightnum,"and");
-        reslt<<"\t%"<<NAME_NUMBER<<" = eq 0, %"<<NAME_NUMBER-1<<endl;
+        reslt << generate_binary_operation(leftnum, rightnum, "and");
+        reslt << "\t%" << NAME_NUMBER << " = eq 0, %" << NAME_NUMBER - 1 << endl;
         NAME_NUMBER++;
         return reslt.str();
     }
@@ -357,18 +390,18 @@ std::string LOrExpAST::DumpKoopa() const {
 
 string LValAST::DumpKoopa() const {
     ostringstream oss;
-    if(!HasName(VAL_MAP,name)){
-        cerr<<"不存在的变量名"<<endl;
-        cerr<<"现在的变量名为\""<<name<<"\""<<endl;
+    if (!HasName(VAL_MAP, name)) {
+        cerr << "不存在的变量名" << endl;
+        cerr << "现在的变量名为\"" << name << "\"" << endl;
 
         assert(0);
     }
-    symboltype rslt = GetLvalValue(VAL_MAP,name);
-    if(rslt.type==ValType::Const){
-        oss<<"\t%"<<NAME_NUMBER++<<"= add 0, "<<Calc()<<endl;
-    }
-    else{
-        oss<<"\t%"<<NAME_NUMBER++<<"= load @"<<name<<endl;
+    symboltype rslt = GetLvalValue(VAL_MAP, name);
+    if (rslt.type == ValType::Const) {
+        oss << "\t%" << NAME_NUMBER++ << "= add 0, " << Calc() << endl;
+    } else {
+        int depth = retValDepth(name);
+        oss << "\t%" << NAME_NUMBER++ << "= load @COMPILER_" << name << "_" << depth << endl;
     }
 
     return oss.str();
@@ -377,35 +410,36 @@ string LValAST::DumpKoopa() const {
 
 string VarDefAST::DumpKoopa() const {
     ostringstream oss;
+    // 记录当前深度用于处理变量名
+    int depth = VAL_MAP.size();
+    string tmpname = name + "_" + to_string(depth);
     //一定是int
-    oss<<"\t@"<<name<<" = alloc i32"<<endl;
-    unordered_map<string,symboltype>& lastMap = VAL_MAP.back();
-    if(value!= nullptr){
+    oss << "\t@COMPILER_" << tmpname << " = alloc i32" << endl;
+    unordered_map <string, symboltype> &lastMap = VAL_MAP.back();
+    if (value != nullptr) {
 
         // 输出表达式的koopa
-        oss<<value->DumpKoopa();
+        oss << value->DumpKoopa();
 
-        oss<<"\tstore %"<<NAME_NUMBER-1<<", @"<<name<<endl;
+        oss << "\tstore %" << NAME_NUMBER - 1 << ", @COMPILER_" << tmpname << endl;
         //将变量的字符存入表中
-        symboltype valstruct = {-7777777,ValType::Var};
+        symboltype valstruct = {-7777777, ValType::Var};
         lastMap[name] = valstruct;
-    }
-    else{
+    } else {
         //默认值，用于报警
-        symboltype valstruct = {-7777777,ValType::Var};
+        symboltype valstruct = {-7777777, ValType::Var};
         lastMap[name] = valstruct;
     }
-    if(next!= nullptr)
-        oss<<next->DumpKoopa();
+    if (next != nullptr)
+        oss << next->DumpKoopa();
     return oss.str();
 }
 
 string LEVal::DumpKoopa() const {
-    // 检查有没有这个变量
-    assert(HasName(VAL_MAP,name));
-
+    // 在表中查找该值在第几层
+    int depth = retValDepth(name);
     //不用存值，直接输出koopa
     ostringstream oss;
-    oss<<"\tstore %"<<NAME_NUMBER-1<<", @"<<name<<endl;
+    oss << "\tstore %" << NAME_NUMBER - 1 << ", @COMPILER_" << name << "_" << depth << endl;
     return oss.str();
 }

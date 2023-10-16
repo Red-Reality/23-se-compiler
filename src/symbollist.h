@@ -29,3 +29,5 @@ bool HasName(vector<unordered_map<string,symboltype>>& sel_map,const string& nam
 symboltype GetLvalValue(vector<unordered_map<string,symboltype>>& sel_map,const string& name);
 
 void SetValue(vector<unordered_map<string,symboltype>>& sel_map,const string& name,symboltype value);
+
+void warnerror(vector <unordered_map<string, symboltype>> &sel_map, const string &name);
