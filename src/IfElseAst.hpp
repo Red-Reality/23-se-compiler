@@ -23,4 +23,28 @@ public:
     string DumpKoopa() const override;
 };
 
+class WhileAST:public BaseAST{
+public:
+    point<BaseAST> condition;
+    point<BaseAST> stmt;
+    WhileAST(){
+        ;
+    }
+    string DumpKoopa() const override;
+};
+
+enum class ConOrBre{
+    CONTINUE,
+    BREAK
+};
+
+class ConBreStmt:public BaseAST{
+public:
+    ConOrBre type;
+    ConBreStmt(){
+        ;
+    }
+    string DumpKoopa() const override;
+};
+
 

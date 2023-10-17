@@ -38,14 +38,14 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN CONST IF ELSE
+%token INT RETURN CONST IF ELSE WHILE BREAK CONTINUE
 %token <str_val> IDENT LOR LAND EQ NEQ GEQ LEQ
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt Number
                 Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
-                Decl LVal  ConstInitVal ConstExp InitVal LEVal FinalStmt NotFinalStmt
+                Decl LVal  ConstInitVal ConstExp InitVal LEVal FinalStmt NotFinalStmt ConBre
 
 %type <blk_val> BlockItemList BlockItem
 %type <cdf_val> ConstDefList ConstDef ConstDecl
@@ -147,6 +147,27 @@ FinalStmt
         ast->elseexp = point<BaseAST>($7);
         $$ = ast;
     }
+    | WHILE '(' Exp ')' FinalStmt{
+        auto ast = new WhileAST();
+        ast->condition = point<BaseAST>($3);
+        ast->stmt = point<BaseAST>($5);
+        $$ = ast;
+    }
+    | ConBre{
+        $$ = $1;
+    }
+    ;
+ConBre
+    : CONTINUE ';'{
+        auto ast = new ConBreStmt();
+        ast->type = ConOrBre::CONTINUE;
+        $$ = ast;
+    }
+    | BREAK ';'{
+        auto ast = new ConBreStmt();
+        ast->type = ConOrBre::BREAK;
+        $$ = ast;
+    }
     ;
 
 NotFinalStmt
@@ -163,6 +184,13 @@ NotFinalStmt
         ast->elseexp = point<BaseAST>($7);
         $$ = ast;
     }
+    | WHILE '(' Exp ')' NotFinalStmt{
+        auto ast = new WhileAST();
+        ast->condition = point<BaseAST>($3);
+        ast->stmt = point<BaseAST>($5);
+        $$ = ast;
+    }
+    ;
 LEVal
     : IDENT{
         auto name = point<string>($1);

@@ -115,6 +115,10 @@ std::string StmtAST::DumpAST() const {
 
 std::string StmtAST::DumpKoopa() const {
     ostringstream oss;
+    if(BLOCK_RET_RECORDER.back()!=0){
+        //当前block已经有ret或者jump或者br了
+        return "";
+    }
     if (type == StmtType::LValEqStmt || type == StmtType::ReturnStmt) {
         if (type==StmtType::ReturnStmt)
             if(BLOCK_RET_RECORDER.back()==0) {
