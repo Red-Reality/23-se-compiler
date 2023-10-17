@@ -19,3 +19,9 @@ void BinVisit(const koopa_raw_value_t &oper, unordered_map<koopa_raw_value_t , i
 
 // 处理store语句
 void StoreVisit(const koopa_raw_value_t& SaveObj,unordered_map<koopa_raw_value_t , int>& mymap,int& stit);
+
+//处理branch语句
+void BranchVisit(const koopa_raw_value_t& obj,unordered_map<koopa_raw_value_t , int>& mymap);
+
+//处理jump语句
+void JumpVisit(const koopa_raw_value_t& obj,unordered_map<koopa_raw_value_t , int>& mymap);

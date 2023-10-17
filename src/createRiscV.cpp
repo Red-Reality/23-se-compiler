@@ -2,7 +2,7 @@
 // Created by leon on 2023/10/3.
 //
 
-/// TODO:重写生成，把map归一成<value_t,int>
+
 #include "koopa.h"
 #include <iostream>
 #include "sstream"
@@ -10,7 +10,7 @@
 #include "map"
 #include "iomanip"
 #include "createRiscV.h"
-
+#include <cstring>
 
 using namespace std;
 
@@ -71,15 +71,21 @@ void parse_string(const char *str) {
             koopa_raw_basic_block_t bb = (koopa_raw_basic_block_t) func->bbs.buffer[tmp];
             length += bb->insts.len;
         }
+        // 一个函数拥有一个栈，记录栈内的元素
+        // 存放的值和栈的偏移量的映射表，当前变量存在栈上
+        unordered_map<koopa_raw_value_t, int> sympol_map;
+        // 迭代器，指示当前栈没有数的最小偏移量
+        int stackIt = 0;
+
         cout << "\taddi sp, sp, -" << length * 4 << endl;
         for (size_t j = 0; j < func->bbs.len; ++j) {
             assert(func->bbs.kind == KOOPA_RSIK_BASIC_BLOCK);
 
-            // 符号表，当前变量存在栈上
-            unordered_map<koopa_raw_value_t , int> sympol_map;
-            // 迭代器，指示当前栈没有数的最小偏移量
-            int stackIt = 0;
+
             koopa_raw_basic_block_t bb = (koopa_raw_basic_block_t) func->bbs.buffer[j];
+
+            if(bb->name)
+                cout<<endl<<bb->name+1<<":"<<endl;
             for (size_t k = 0; k < bb->insts.len; ++k) {
                 koopa_raw_value_t value = (koopa_raw_value_t) bb->insts.buffer[k];
 //                cerr << value->kind.tag << endl;
@@ -94,7 +100,7 @@ void parse_string(const char *str) {
                     BinVisit(value, sympol_map, stackIt);
                 } else if (value->kind.tag == KOOPA_RVT_RETURN) {
                     //这部分之后还要改，暂时用特例写死,认为ret的数据一定存在栈底
-                    cout << "\tlw a0, " << stackIt - 4 << "(sp)" << endl;
+                    cout << "\tlw a0, " << sympol_map[value->kind.data.ret.value]<< "(sp)" << endl;
                     //恢复现场
                     cout << "\taddi sp, sp, " << length * 4 << endl;
                     cout << "\tret" << endl;
@@ -104,17 +110,18 @@ void parse_string(const char *str) {
                     StoreVisit(value, sympol_map, stackIt);
                 } else if (value->kind.tag == KOOPA_RVT_LOAD) {
                     // 把该语句指向load的语句的栈偏移量
-                        sympol_map[value] = sympol_map[value->kind.data.load.src];
-                        cerr << "load addr(value):" << (ull) value << ", stit:" << sympol_map[value] << endl;
-                        cerr<<"load addr(value) detail: src="<<(ull)value->kind.data.load.src<<", its stit = "<<sympol_map[value->kind.data.load.src]<<endl;
-                        cerr<<"src's type is: "<<value->kind.tag<<endl;
-//
-
-
-
+                    sympol_map[value] = sympol_map[value->kind.data.load.src];
+                    cerr << "load addr(value):" << (ull) value << ", stit:" << sympol_map[value] << endl;
+                    cerr << "load addr(value) detail: src=" << (ull) value->kind.data.load.src << ", its stit = "
+                         << sympol_map[value->kind.data.load.src] << endl;
+                    cerr << "src's type is: " << value->kind.tag << endl;
                 } else if (value->kind.tag == KOOPA_RVT_ALLOC) {
                     //不处理，store的时候才真的存这个数
                     continue;
+                } else if (value->kind.tag == KOOPA_RVT_BRANCH) {
+                    BranchVisit(value,sympol_map);
+                } else if (value->kind.tag == KOOPA_RVT_JUMP) {
+                    JumpVisit(value,sympol_map);
                 } else {
                     cerr << "unexpected statement, type is: " << value->kind.tag << endl;
                     assert(0);
@@ -172,12 +179,12 @@ void BinVisit(const koopa_raw_value_t &valtmp, unordered_map<koopa_raw_value_t, 
         }
 
     } else {
-        assert(value_reg_map.find(oper.lhs)!=value_reg_map.end());
+        assert(value_reg_map.find(oper.lhs) != value_reg_map.end());
         //如果是表达式，取出栈上保存的值放入t0，不会用到其他寄存器
-        cerr << "load lhs addr:" << (ull)  (oper.lhs) << ", stit="
+        cerr << "load lhs addr:" << (ull) (oper.lhs) << ", stit="
              << value_reg_map[oper.lhs] << endl;
-        cerr<<"lhs addr is"<<(ull)(oper.lhs)<<endl;
-        cout << "\tlw t0," << value_reg_map[oper.lhs]  << "(sp)" << endl;
+        cerr << "lhs addr is" << (ull) (oper.lhs) << endl;
+        cout << "\tlw t0," << value_reg_map[oper.lhs] << "(sp)" << endl;
     }
     if (oper.rhs->kind.tag == KOOPA_RVT_INTEGER) {
         if (oper.rhs->kind.data.integer.value == 0) {
@@ -188,7 +195,7 @@ void BinVisit(const koopa_raw_value_t &valtmp, unordered_map<koopa_raw_value_t, 
                  << endl;
         }
     } else {
-        assert(value_reg_map.find(oper.rhs)!=value_reg_map.end());
+        assert(value_reg_map.find(oper.rhs) != value_reg_map.end());
         //如果是表达式，取出栈上保存的值放入t1，不会用到其他寄存器
         cerr << "load rhs addr:" << (ull) (oper.rhs) << ", stit="
              << value_reg_map[oper.rhs] << endl;
@@ -282,7 +289,7 @@ void StoreVisit(const koopa_raw_value_t &obj, unordered_map<koopa_raw_value_t, i
     if (value->kind.tag == KOOPA_RVT_INTEGER) {
         cout << "\tli t0, " << value->kind.data.integer.value << endl;
     } else if (value->kind.tag == KOOPA_RVT_BINARY) {
-        assert(mymap.find(value)!=mymap.end());
+        assert(mymap.find(value) != mymap.end());
         cout << "\tlw t0, " << mymap[value] << "(sp)" << endl;
     } else {
         cerr << "unexpected type,type tag is:" << value->kind.tag << endl;
@@ -297,4 +304,25 @@ void StoreVisit(const koopa_raw_value_t &obj, unordered_map<koopa_raw_value_t, i
     }
 //    cerr << "store addr=" << (ull) dest << ", stackit= " << mymap[dest] << endl;
     cout << "\tsw t0, " << mymap[dest] << "(sp)" << endl;
+}
+
+void BranchVisit(const koopa_raw_value_t& obj,unordered_map<koopa_raw_value_t , int>& mymap){
+    //branch和jump指令就用t3寄存器
+    const koopa_raw_branch_t bran = obj->kind.data.branch;
+    cout<<"\tlw t3, "<<mymap[bran.cond]<<"(sp)"<<endl;
+
+    // 由于beqz只能跳转12位立即数的地方，范围不能太大。因此先跳到标签再从标签跳出去
+    cout<<"\tbeqz t3, "<<bran.false_bb->name+1<<"_trans"<<endl;
+    cout<<"\tbnez t3, "<<bran.true_bb->name+1<<"_trans"<<endl;
+
+    cout<<endl<<bran.false_bb->name+1<<"_trans:"<<endl;
+    cout<<"\tj "<<bran.false_bb->name+1<<endl;
+    cout<<endl<<bran.true_bb->name+1<<"_trans:"<<endl;
+    cout<<"\tj "<<bran.true_bb->name+1<<endl;
+}
+
+void JumpVisit(const koopa_raw_value_t& obj,unordered_map<koopa_raw_value_t , int>& mymap){
+    const koopa_raw_jump_t jum = obj->kind.data.jump;
+    cout<<"\tj "<<jum.target->name+1<<endl;
+    cout<<endl;
 }

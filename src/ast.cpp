@@ -12,7 +12,19 @@ using namespace std;
 /// %NAME_NUMBER 意思是下一个空着的变量符而不是最后一个已用的变量
 int NAME_NUMBER=0;
 
+/// 用于记录每一层符号表被用过几次，避免变量重名
+vector<int> VALMAP_LEVELREC;
 
+void VALMAP_push(){
+    VAL_MAP.push_back(unordered_map<string, symboltype>());
+    if(VAL_MAP.size()>VALMAP_LEVELREC.size()){
+        //说明要加一层
+        VALMAP_LEVELREC.push_back(0);
+    } else{
+        assert(!VALMAP_LEVELREC.empty());
+        VALMAP_LEVELREC[VAL_MAP.size()-1]++;
+    }
+}
 int retValDepth(string name) {
     int depth = VAL_MAP.size();
     for (auto it = VAL_MAP.rbegin(); it != VAL_MAP.rend(); it++) {
@@ -87,9 +99,8 @@ std::string BlockItemAST::DumpKoopa() const {
 }
 
 std::string BlockAST::DumpKoopa() const {
-    VAL_MAP.push_back(unordered_map<string, symboltype>());
 
-
+    VALMAP_push();
     string rslt = "";
     if (stmt != nullptr)
         rslt += stmt->DumpKoopa();
@@ -410,7 +421,8 @@ string LValAST::DumpKoopa() const {
         oss << "\t%" << NAME_NUMBER++ << "= add 0, " << Calc() << endl;
     } else {
         int depth = retValDepth(name);
-        oss << "\t%" << NAME_NUMBER++ << "= load @COMPILER_" << name << "_" << depth << endl;
+        assert(depth>0);
+        oss << "\t%" << NAME_NUMBER++ << "= load @COMPILER_" << name << "_" << depth<<"_"<<VALMAP_LEVELREC[depth-1] << endl;
     }
 
     return oss.str();
@@ -421,7 +433,8 @@ string VarDefAST::DumpKoopa() const {
     ostringstream oss;
     // 记录当前深度用于处理变量名
     int depth = VAL_MAP.size();
-    string tmpname = name + "_" + to_string(depth);
+    assert(depth>0);
+    string tmpname = name + "_" + to_string(depth)+"_"+ to_string(VALMAP_LEVELREC[depth-1]);
     //一定是int
     oss << "\t@COMPILER_" << tmpname << " = alloc i32" << endl;
     unordered_map <string, symboltype> &lastMap = VAL_MAP.back();
@@ -447,8 +460,9 @@ string VarDefAST::DumpKoopa() const {
 string LEVal::DumpKoopa() const {
     // 在表中查找该值在第几层
     int depth = retValDepth(name);
+    assert(depth>0);
     //不用存值，直接输出koopa
     ostringstream oss;
-    oss << "\tstore %" << NAME_NUMBER - 1 << ", @COMPILER_" << name << "_" << depth << endl;
+    oss << "\tstore %" << NAME_NUMBER - 1 << ", @COMPILER_" << name << "_" << depth<<"_"<<VALMAP_LEVELREC[depth-1] << endl;
     return oss.str();
 }

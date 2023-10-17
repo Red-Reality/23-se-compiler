@@ -14,3 +14,7 @@ extern int NAME_NUMBER;
 
 /// 用于记录当前块是否已经有ret
 extern vector<int> BLOCK_RET_RECORDER;
+
+
+/// 用于记录每一层符号表被用过几次，避免变量重名
+extern vector<int> VALMAP_LEVELREC;
