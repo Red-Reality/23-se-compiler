@@ -56,7 +56,7 @@ std::string FuncDefAST::DumpKoopa() const {
     oss << "fun @" << ident << "():" << func_type->DumpKoopa() << "{\n" << "%entry:\n" << block->DumpKoopa();
     //有寄存器用了
 
-    oss<< "\n}";
+    oss<< "}";
     BLOCK_RET_RECORDER.pop_back();
     return oss.str();
 }
@@ -108,7 +108,7 @@ std::string StmtAST::DumpKoopa() const {
         if (type==StmtType::ReturnStmt)
             if(BLOCK_RET_RECORDER.back()==0) {
                 BLOCK_RET_RECORDER.back()=1;
-                return num->DumpKoopa() + "\tret %" + to_string(NAME_NUMBER - 1);
+                return num->DumpKoopa() + "\tret %" + to_string(NAME_NUMBER - 1)+'\n';
             }
             else
                 return "";

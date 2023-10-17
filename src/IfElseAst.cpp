@@ -7,7 +7,7 @@
 
 int IF_COUNT = 0;
 
-///TODO: IFCOUNT的计数有问题，需要考虑嵌套
+
 vector<int> BLOCK_RET_RECORDER;
 string IfElseAST::DumpKoopa() const {
     // 检查有没有输出跳转地址
@@ -18,23 +18,24 @@ string IfElseAST::DumpKoopa() const {
     //首先将求出的值存入寄存器
     ostringstream oss;
     oss<<sequence->DumpKoopa();
-//    cerr<<oss.str()<<endl;
-    // br指令跳转
-    oss<<"\tbr %"<<NAME_NUMBER-1<<", %COMPILER_then_"<<IF_COUNT;
-    if(elseexp!= nullptr)
-        oss<<", %COMPILER_else_"<<IF_COUNT<<endl;
-    IF_COUNT++;
 
-    //分行，更好看点
-    oss<<endl<<endl;
+    int ifcnt = IF_COUNT++;
+    // br指令跳转
+    oss<<"\tbr %"<<NAME_NUMBER-1<<", %COMPILER_then_"<<ifcnt;
+    if(elseexp!= nullptr)
+        oss<<", %COMPILER_else_"<<ifcnt<<endl;
+    else{
+        oss<<", %COMPILER_end_"<<ifcnt<<endl;
+        output_end_signal= true;
+    }
 
     //处理if内的语句
-    oss<<"%COMPILER_then_"<<IF_COUNT-1<<":"<<endl;
+    oss<<endl<<"%COMPILER_then_"<<ifcnt<<":"<<endl;
     //进入if内部的基本块
     BLOCK_RET_RECORDER.push_back(0);
     oss<<ifexp->DumpKoopa();
     if(BLOCK_RET_RECORDER.back()==0){
-        oss<<"\tjump %COMPILER_end_"<<IF_COUNT-1<<endl<< endl;
+        oss<<"\tjump %COMPILER_end_"<<ifcnt<<endl;
         output_end_signal= true;
     }
     BLOCK_RET_RECORDER.pop_back();
@@ -42,16 +43,22 @@ string IfElseAST::DumpKoopa() const {
     if(elseexp!= nullptr){
         //进入else的基本块
         BLOCK_RET_RECORDER.push_back(0);
-        oss<<"%COMPILER_else_"<<IF_COUNT-1<<endl;
+        oss<<endl<<"%COMPILER_else_"<<ifcnt<<":"<<endl;
         oss<<elseexp->DumpKoopa();
         if(BLOCK_RET_RECORDER.back()==0){
-            oss<<"\tjump %COMPILER_end_"<<IF_COUNT-1<<endl<<endl;
+            oss<<"\tjump %COMPILER_end_"<<ifcnt<<endl;
             output_end_signal= true;
         }
+        BLOCK_RET_RECORDER.pop_back();
     }
 
     if(output_end_signal){
-        oss<<"%COMPILER_end_"<<IF_COUNT-1<<endl;
+        oss<<endl<<"%COMPILER_end_"<<ifcnt<<":"<<endl;
+
+    }else{
+        // 说明在这一部分全部值已经返回了
+        assert(!BLOCK_RET_RECORDER.empty());
+        BLOCK_RET_RECORDER.back() = 1;
     }
     return oss.str();
 }

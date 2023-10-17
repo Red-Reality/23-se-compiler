@@ -1,4 +1,5 @@
 int main() {
-    const int i=1,j=i,k=3;
-    return j;
+    if (0) return 1;
+    else return 2;
+    return 3;
 }
