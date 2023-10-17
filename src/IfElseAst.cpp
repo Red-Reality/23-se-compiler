@@ -53,7 +53,7 @@ string IfElseAST::DumpKoopa() const {
     }
 
     if(output_end_signal){
-        oss<<endl<<"\t%COMPILER_end_"<<ifcnt<<":"<<endl;
+        oss<<endl<<"%COMPILER_end_"<<ifcnt<<":"<<endl;
 
     }else{
         // 说明在这一部分全部值已经返回了
@@ -62,6 +62,9 @@ string IfElseAST::DumpKoopa() const {
     }
     return oss.str();
 }
+
+/// 进去前所在的while的标号
+int cur_while=-1;
 string WhileAST::DumpKoopa() const {
     // 所在块不应该已经有ret，有的话不需要执行下面语句
 
@@ -69,7 +72,9 @@ string WhileAST::DumpKoopa() const {
         return "";
 
     int whl_cnt = WHILE_COUNT++;
-
+    int lst_whl_cnt = cur_while;
+    //进入该while了，修改cur_while编号
+    cur_while = whl_cnt;
 
     ostringstream oss;
     oss<<"\tjump %WHILE_ENTRY_"<<whl_cnt<<endl;
@@ -86,20 +91,23 @@ string WhileAST::DumpKoopa() const {
     oss<< endl<<"%WHILE_BODY_"<<whl_cnt<<":"<<endl;
     oss<<stmt->DumpKoopa();
     if(BLOCK_RET_RECORDER.back()==0){
-        oss<<"jump %WHILE_ENTRY_"<<whl_cnt<< endl;
+        oss<<"\tjump %WHILE_ENTRY_"<<whl_cnt<< endl;
     }
     BLOCK_RET_RECORDER.pop_back();
     //离开while块
     //现在当前块是没有返回过的
     if(BLOCK_RET_RECORDER.back()==0)
         oss<<endl<<"%WHILE_END_"<<whl_cnt<<":"<<endl;
+    // 退出该while了，回到原来的while编号
+    cur_while = lst_whl_cnt;
     return oss.str();
 
 }
 
-/// TODO：想不到怎么实现判断break和continue不在while内的错误情况
 string ConBreStmt::DumpKoopa() const {
-    // 一定是推出了当前的语句块
+    // 当前while编号一定不是-1,否则语义错误
+    assert(cur_while!=-1);
+    // 一定是退出了当前的语句块
     ostringstream oss;
     BLOCK_RET_RECORDER.back()=1;
     switch (type) {
