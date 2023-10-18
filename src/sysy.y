@@ -34,11 +34,12 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
     BlockItemAST *blk_val;
     ConstDefAST *cdf_val;
     VarDefAST *vdf_val;
+    ASTList   *lst_val;
 }
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN CONST IF ELSE WHILE BREAK CONTINUE
+%token INT RETURN CONST IF ELSE WHILE BREAK CONTINUE VOID
 %token <str_val> IDENT LOR LAND EQ NEQ GEQ LEQ
 %token <int_val> INT_CONST
 
@@ -46,11 +47,13 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 %type <ast_val> FuncDef FuncType Block Stmt Number
                 Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
                 Decl LVal  ConstInitVal ConstExp InitVal LEVal FinalStmt NotFinalStmt ConBre
+                FuncPara FuncExp FuncExpPara
+
 
 %type <blk_val> BlockItemList BlockItem
 %type <cdf_val> ConstDefList ConstDef ConstDecl
 %type <vdf_val> VarDecl VarDefList VarDef
-
+%type <lst_val> FuncParaList FuncExpParaList CompUnitList
 %%
 
 // 开始符, CompUnit ::= FuncDef, 大括号后声明了解析完成后 parser 要做的事情
@@ -58,7 +61,11 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 CompUnit
     : FuncDef {
         auto func = std::unique_ptr<BaseAST>($1);
-        ast = std::unique_ptr<BaseAST>(new CompUnitAST(func));
+        $$ = new CompUnitAST(func);
+    }
+    | Decl{
+        auto astp = point<BaseAST>($1);
+        $$ = new CompUnitAST(
     }
     ;
 
@@ -71,12 +78,39 @@ FuncDef
         auto block = std::unique_ptr<BaseAST>($5);
         $$ = new FuncDefAST(type, ident->c_str(), block);
     }
+    | FuncType IDENT '(' FuncParaList ')' Block{
+        auto ast = new FuncDefAST();
+        ast->func_type = std::unique_ptr<BaseAST>($1);
+        ast->ident = std::unique_ptr<std::string>($2)->c_str();
+        ast->block = std::unique_ptr<BaseAST>($6);
+        ast->params = point<ASTList>($4);
+        $$ = ast;
+    }
     ;
 
+FuncParaList
+    : FuncPara{
+        $$ = new ASTList();
+        $$->val = point<BaseAST>($1);
+    }
+    | FuncPara ',' FuncParaList{
+        $$ =new ASTList();
+        $$->next = point<BaseAST>($3);
+        $$->val = point<BaseAST>($1);
+    }
+FuncPara
+    : INT IDENT{
+        auto ast = new FuncPara();
+        ast->name = point<std::string>($2)->c_str();
+        $$ = ast;
+    }
 // 同上, 不再解释
 FuncType
     : INT {
         $$ = new FuncTypeAST("int");
+    }
+    | VOID{
+        $$ = new FuncTypeAST("void");
     }
     ;
 
@@ -308,8 +342,41 @@ UnaryExp
         auto unaryexp = std::unique_ptr<BaseAST>($2);
         $$ = new UnaryExpAST(unaryexp,UnaryOp::LogicalFalse);
     }
+    | FuncExp{
+        auto astpoint = point<BaseAST>($1);
+        $$ = new UnaryExpAST(astpoint,UnaryOp::Function);
+    }
     ;
-
+FuncExp
+    : IDENT '(' ')'{
+        auto ast = new FuncExpAST();
+        ast->name = point<string>($1)->c_str();
+        $$ = ast;
+    }
+    | IDENT '(' FuncExpParaList ')'{
+        auto ast = new FuncExpAST();
+        ast->name = point<string>($1)->c_str();
+        ast->params = point<ASTList>($3);
+    }
+    ;
+FuncExpParaList
+    : FuncExpPara{
+        auto ast = new ASTList();
+        ast->val = point<BaseAST>($1);
+        $$ = ast;
+    }
+    | FuncExpPara ',' FuncExpParaList{
+        auto ast = new ASTList();
+        ast->next = point<ASTList>($3);
+        ast->val = point<ASTList>($1);
+    }
+    ;
+FuncExpPara
+    : IDENT{
+        auto ast = new FuncExpParamAST();
+        ast->paramname = point<string>($1);
+        $$ = ast;
+    }
 MulExp
     : UnaryExp{
         auto unaryexp = std::unique_ptr<BaseAST>($1);
