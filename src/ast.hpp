@@ -9,6 +9,7 @@
 #include <vector>
 #include <cassert>
 #include "symbollist.h"
+
 using namespace std;
 // 所有 AST 的基类
 
@@ -32,6 +33,14 @@ public:
     virtual int Calc() const {
         cerr<<"Not Implied Calc,unexcept situation may be occur"<<endl;
         return 0;
+    }
+    virtual string ExtraOutput() const{
+        cerr<<"this function should not be called in default,please check if you have overriden the function"<<endl;
+        assert(0);
+    }
+    virtual vector<int>CommunicateIntVector() const{
+        cerr<<"this function should not be used unless it is overriden"<<endl;
+        assert(0);
     }
 };
 
@@ -88,6 +97,8 @@ public:
     FuncFParamsAST(){
         ;
     }
+    string DumpKoopa() const override;
+    string ExtraOutput() const override;
 };
 
 class FuncCallAST:public BaseAST{
@@ -97,15 +108,25 @@ public:
     FuncCallAST(){
         ;
     }
+    string DumpKoopa() const override;
 };
 
 class FuncRParamsAST: public BaseAST{
 public:
     point<BaseAST>exp;
     point<BaseAST>next;
+    mutable vector<int> paramregnum;
     FuncRParamsAST(){
         ;
     }
+    vector<int> CommunicateIntVector() const override{
+        return paramregnum;
+    };
+    void pushback_paramregnum(int num){
+        paramregnum.push_back(num);
+    }
+    string DumpKoopa() const override;
+
 };
 
 class BlockAST : public BaseAST {
@@ -243,6 +264,10 @@ public:
     UnaryExpAST(std::unique_ptr<BaseAST> &_u_exp,UnaryOp _type = UnaryOp::Positive){
         u_exp = std::move(_u_exp);
         type = _type;
+    }
+
+    UnaryExpAST(){
+        ;
     }
 
     std::string DumpAST() const override;

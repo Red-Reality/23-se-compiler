@@ -4,7 +4,22 @@
 
 #pragma once
 #include <vector>
+#include <unordered_map>
 using namespace std;
+
+enum class ValType{
+    Const,
+    Var,
+    IntFuncname,
+    VoidFuncname
+};
+
+struct symboltype{
+    int num;
+    ValType type;
+};
+
+
 //用于命名if跳转标签
 extern int IF_COUNT ;
 
@@ -18,3 +33,6 @@ extern vector<int> BLOCK_RET_RECORDER;
 
 /// 用于记录每一层符号表被用过几次，避免变量重名
 extern vector<int> VALMAP_LEVELREC;
+
+/// 常量表
+extern vector<unordered_map<string,symboltype>> VAL_MAP;

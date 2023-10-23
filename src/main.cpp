@@ -9,12 +9,34 @@
 
 #include "ast.hpp"
 #include "createRiscV.h"
+#include "symbollist.h"
 using namespace std;
 
 // 声明 lexer 的输入, 以及 parser 函数
 extern FILE *yyin;
 extern int yyparse(std::unique_ptr<BaseAST> &ast);
 
+void prepare(){
+    // 初始化时先存入全局符号表
+    VALMAP_push();
+
+    //初始化库函数
+    cout<<"decl @getint(): i32"<<endl;
+    cout<<"decl @getch(): i32"<<endl;
+    cout<<"decl @getarray(*i32): i32"<<endl;
+    cout<<"decl @putint(i32)"<<endl;
+    cout<<"decl @putch(i32)"<<endl;
+    cout<<"decl @putarray(i32, *i32)"<<endl;
+
+    //插入库函数名
+    unordered_map<string,symboltype>& last = VAL_MAP[0];
+    last["getint"] = {-3333333,ValType::IntFuncname};
+    last["getch"] = {-3333333,ValType::IntFuncname};
+    last["getarray"] = {-3333333,ValType::IntFuncname};
+    last["putint"] = {-3333333,ValType::VoidFuncname};
+    last["putch"] = {-3333333,ValType::VoidFuncname};
+    last["putarray"] = {-3333333,ValType::VoidFuncname};
+}
 int main(int argc, const char *argv[])
 {
     ios::sync_with_stdio(false);
@@ -38,7 +60,10 @@ int main(int argc, const char *argv[])
     if(strcmp(mode,"-koopa")==0)
     {
         freopen(output,"w",stdout);
+
+        prepare();
         cout<<ast->DumpKoopa()<<endl;
+
         return 0;
     }
     else if (strcmp(mode,"-riscv")==0){
