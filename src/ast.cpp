@@ -197,6 +197,9 @@ std::string UnaryExpAST::DumpAST() const {
         case UnaryOp::LogicalFalse:
             oper = "!";
             break;
+        default:
+            cerr<<"unexpected unary exp,abort"<<endl;
+            assert(0);
     }
 
     return "UnaryExpAST{  \n" + oper + "(" + u_exp->DumpAST() + ")}";
@@ -217,6 +220,9 @@ std::string UnaryExpAST::DumpKoopa() const {
             NAME_NUMBER++;
             ///cout<<"LogicalFalse:"<<NAME_NUMBER<<endl;
             return rslt;
+        default:
+            cerr<<"unexpected unary exp,abort"<<endl;
+            assert(0);
 
     }
 }

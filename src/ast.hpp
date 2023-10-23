@@ -40,7 +40,7 @@ class CompUnitAST : public BaseAST {
 public:
     // 用智能指针管理对象
     std::unique_ptr <BaseAST> func_def;
-
+    point<BaseAST> next;
     CompUnitAST(std::unique_ptr <BaseAST> &_func_def) {
         func_def = std::move(_func_def);
     }
@@ -56,6 +56,7 @@ public:
     std::unique_ptr <BaseAST> func_type;
     std::string ident;
     std::unique_ptr <BaseAST> block;
+    point<BaseAST> FuncFParams;
 
     FuncDefAST(std::unique_ptr <BaseAST> &_func_type, const char *_ident, std::unique_ptr <BaseAST> &_block)
             : ident(_ident) {
@@ -80,6 +81,32 @@ public:
     std::string DumpKoopa() const override;
 };
 
+class FuncFParamsAST:public BaseAST{
+public:
+    point<string> name;
+    point<BaseAST> next;
+    FuncFParamsAST(){
+        ;
+    }
+};
+
+class FuncCallAST:public BaseAST{
+public:
+    point<string> name;
+    point<BaseAST> paramlist;
+    FuncCallAST(){
+        ;
+    }
+};
+
+class FuncRParamsAST: public BaseAST{
+public:
+    point<BaseAST>exp;
+    point<BaseAST>next;
+    FuncRParamsAST(){
+        ;
+    }
+};
 
 class BlockAST : public BaseAST {
 public:
@@ -204,7 +231,8 @@ public:
 enum class UnaryOp{
     Positive=0,
     Negative,
-    LogicalFalse
+    LogicalFalse,
+    FunctionCall
 };
 class UnaryExpAST :public BaseAST{
 public:
@@ -229,6 +257,9 @@ public:
                 return -u_exp->Calc();
             case UnaryOp::LogicalFalse:
                 return !u_exp->Calc();
+            default:
+                cerr<<"unexpected unaryop, failed"<<endl;
+                assert(0);
         }
     }
 };
