@@ -18,7 +18,7 @@ using namespace std;
 template<typename T>
 using point = std::unique_ptr<T>;
 
-
+/// TODO:为全局变量实现新的ast，复用ast会导致识别有二义性
 class BaseAST {
 public:
     virtual ~BaseAST() = default;
@@ -84,7 +84,9 @@ public:
     std::string name;
 
     FuncTypeAST(const char *_name) : name(_name) {}
-
+    FuncTypeAST(){
+        ;
+    }
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
@@ -561,6 +563,7 @@ public:
     string name;
     point<BaseAST> value;
     point<BaseAST> next;
+    bool IsGlobal = false;
 
     VarDefAST(string _name, point<BaseAST>& _value){
         name = _name;
@@ -585,4 +588,14 @@ public:
         ;
     }
     string  DumpKoopa() const override;
+};
+
+class GlobDeclAST:public BaseAST{
+public:
+    point<BaseAST> decllist;
+    bool IsConst;
+    GlobDeclAST(){
+        ;
+    }
+    string DumpKoopa() const override;
 };

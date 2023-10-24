@@ -44,7 +44,7 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
-%type <ast_val> FuncDef FuncType Block Stmt Number CompUnit
+%type <ast_val> FuncDef Block Stmt Number CompUnit GlobDecl
                 Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
                 Decl LVal  ConstInitVal ConstExp InitVal LEVal FinalStmt NotFinalStmt ConBre
                 FuncFParamList FuncRParams
@@ -52,7 +52,7 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 %type <str_val> FuncFParam
 %type <blk_val> BlockItemList BlockItem
 %type <cdf_val> ConstDefList ConstDef ConstDecl
-%type <vdf_val> VarDecl VarDefList VarDef
+%type <vdf_val> VarDecl VarDefList VarDef GlobVarList
 
 %%
 
@@ -75,24 +75,78 @@ CompUnit
 
         $$ = compast;
     }
+    | GlobDecl{
+        auto decl = point<BaseAST>($1);
+        auto compast = new CompUnitAST(decl);
+        $$ = compast;
+    }
+    | GlobDecl CompUnit{
+        auto decl = point<BaseAST>($1);
+        auto compast = new CompUnitAST(decl);
+        compast->next = point<BaseAST>($2);
+        $$ = compast;
+    }
     ;
-
+GlobDecl
+    : ConstDecl{
+        auto ast = new GlobDeclAST();
+        ast->decllist = point<BaseAST>($1);
+        ast->IsConst = true;
+        $$ = ast;
+    }
+    | INT GlobVarList ';'{
+        auto ast = new GlobDeclAST();
+        ast->decllist = point<BaseAST>($2);
+        ast->IsConst = false;
+        $$ = ast;
+    }
+    ;
+GlobVarList
+    : VarDef{
+        auto ast = $1;
+        ast->IsGlobal = true;
+        $$ = ast;
+    }
+    | VarDef ',' GlobVarList{
+        auto ast = $1;
+        ast->next = point<BaseAST>($3);
+        ast->IsGlobal = true;
+        $$ = ast;
+    }
 // FuncDef ::= FuncType IDENT '(' ')' Block;
 // $$ 表示非终结符的返回值, 我们可以通过给这个符号赋值的方法来返回结果
 FuncDef
-    : FuncType IDENT '(' ')' Block {
-        auto type = std::unique_ptr<BaseAST>($1);
+    : INT IDENT '(' ')' Block {
+        auto tmp =new FuncTypeAST("int");
+        auto type = point<BaseAST>(tmp);
         auto ident = std::unique_ptr<std::string>($2);
         auto block = std::unique_ptr<BaseAST>($5);
         $$ = new FuncDefAST(type, ident->c_str(), block);
     }
-    | FuncType IDENT '(' FuncFParamList ')' Block{
-        auto type = std::unique_ptr<BaseAST>($1);
+    | INT IDENT '(' FuncFParamList ')' Block{
+        auto tmp =new FuncTypeAST("int");
+        auto type = point<BaseAST>(tmp);
         auto ident = std::unique_ptr<std::string>($2);
         auto block = std::unique_ptr<BaseAST>($6);
         auto ast = new FuncDefAST(type, ident->c_str(), block);
         ast->FuncFParams = point<BaseAST>($4);
         $$ = ast;
+    }
+    | VOID IDENT '(' FuncFParamList ')' Block{
+        auto tmp =new FuncTypeAST("void");
+        auto type = point<BaseAST>(tmp);
+        auto ident = std::unique_ptr<std::string>($2);
+        auto block = std::unique_ptr<BaseAST>($6);
+        auto ast = new FuncDefAST(type, ident->c_str(), block);
+        ast->FuncFParams = point<BaseAST>($4);
+        $$ = ast;
+    }
+    | VOID IDENT '(' ')' Block {
+        auto tmp = new FuncTypeAST("void");
+        auto type = point<BaseAST>(tmp);
+        auto ident = std::unique_ptr<std::string>($2);
+        auto block = std::unique_ptr<BaseAST>($5);
+        $$ = new FuncDefAST(type, ident->c_str(), block);
     }
     ;
 FuncFParamList
@@ -111,15 +165,7 @@ FuncFParam
     : INT IDENT{
         $$ = $2;
     }
-// 同上, 不再解释
-FuncType
-    : INT {
-        $$ = new FuncTypeAST("int");
-    }
-    | VOID{
-        $$ = new FuncTypeAST("void");
-    }
-    ;
+
 
 Block
     : '{' BlockItemList '}' {
@@ -376,10 +422,10 @@ FuncRParams
         ast->exp = point<BaseAST>($1);
         $$ = ast;
     }
-    | Exp FuncRParams{
+    | Exp ',' FuncRParams{
         auto ast = new FuncRParamsAST();
         ast->exp = point<BaseAST>($1);
-        ast->next = point<BaseAST>($2);
+        ast->next = point<BaseAST>($3);
         $$ = ast;
     }
 MulExp

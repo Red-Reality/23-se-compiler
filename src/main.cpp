@@ -27,6 +27,7 @@ void prepare(){
     cout<<"decl @putint(i32)"<<endl;
     cout<<"decl @putch(i32)"<<endl;
     cout<<"decl @putarray(i32, *i32)"<<endl;
+    cout<<endl<<endl;
 
     //插入库函数名
     unordered_map<string,symboltype>& last = VAL_MAP[0];

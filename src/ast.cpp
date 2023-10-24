@@ -49,7 +49,7 @@ std::string FuncDefAST::DumpKoopa() const {
     VALMAP_push();
 
     // 将函数名存入全局变量组中
-    if (func_type->DumpKoopa() == "i32") {
+    if (func_type->DumpKoopa() == ":i32") {
         VAL_MAP[0][ident] = {-3212345, ValType::IntFuncname};
 //        cerr << "funcname is " << ident << endl;
     } else if (func_type->DumpKoopa() == "") {
@@ -62,10 +62,12 @@ std::string FuncDefAST::DumpKoopa() const {
     oss << "fun @" << ident << "(";
     if (FuncFParams != nullptr)
         oss << FuncFParams->DumpKoopa();
-    oss << "):" << func_type->DumpKoopa() << "{\n" << "%entry:\n";
+    oss << ")" << func_type->DumpKoopa() << "{\n" << "%entry:\n";
     if (FuncFParams != nullptr)
         oss << FuncFParams->ExtraOutput();
     oss << block->DumpKoopa();
+    if(BLOCK_RET_RECORDER.back()==0)
+        oss<<"\tret\n";
     oss << "}\n";
 
     BLOCK_RET_RECORDER.pop_back();
@@ -77,9 +79,9 @@ std::string FuncDefAST::DumpKoopa() const {
 
 string FuncFParamsAST::DumpKoopa() const {
     ostringstream oss;
-    oss << "@" << name->c_str() << ": i32, ";
+    oss << "@" << name->c_str() << ": i32";
     if (next != nullptr)
-        oss << next->DumpKoopa();
+        oss <<", "<< next->DumpKoopa();
     return oss.str();
 }
 
@@ -96,6 +98,8 @@ string FuncFParamsAST::ExtraOutput() const {
     //将变量的字符存入表中
     symboltype valstruct = {-7777777, ValType::Var};
     lastMap[*name.get()] = valstruct;
+    if(next!= nullptr)
+        oss<<next->ExtraOutput();
     return oss.str();
 }
 
@@ -105,7 +109,7 @@ std::string FuncTypeAST::DumpAST() const {
 
 std::string FuncTypeAST::DumpKoopa() const {
     if (name == "int")
-        return std::string("i32");
+        return std::string(":i32");
     else
         return "";
 }
@@ -134,8 +138,7 @@ std::string BlockAST::DumpKoopa() const {
     if (stmt != nullptr)
         rslt += stmt->DumpKoopa();
     VAL_MAP.pop_back();
-    if (BLOCK_RET_RECORDER.back() == 0)
-        rslt += "\tret\n";
+
     return rslt;
 }
 
@@ -243,7 +246,7 @@ std::string UnaryExpAST::DumpKoopa() const {
     std::string rslt = u_exp->DumpKoopa();
     switch (type) {
         case UnaryOp::Positive:
-            return u_exp->DumpKoopa();
+            return rslt;
         case UnaryOp::Negative:
             rslt += "\t%" + to_string(NAME_NUMBER) + " = sub 0, %" + to_string(NAME_NUMBER - 1) + "\n";
             NAME_NUMBER++;
@@ -402,6 +405,7 @@ std::string LAndExpAST::DumpKoopa() const {
         return e_exp->DumpKoopa();
     else {
         reslt << l_exp->DumpKoopa();
+        /// TODO:短路运算
         int leftnum = NAME_NUMBER - 1;
         reslt << e_exp->DumpKoopa();
         int rightnum = NAME_NUMBER - 1;
@@ -430,6 +434,8 @@ std::string LOrExpAST::DumpKoopa() const {
     if (type == AndOrType::NoLogic)
         return And_exp->DumpKoopa();
     else {
+
+        /// TODO:短路运算
         reslt << Or_exp->DumpKoopa();
         int leftnum = NAME_NUMBER - 1;
         reslt << And_exp->DumpKoopa();
@@ -465,11 +471,17 @@ string LValAST::DumpKoopa() const {
     symboltype rslt = GetLvalValue(VAL_MAP, name);
     if (rslt.type == ValType::Const) {
         oss << "\t%" << NAME_NUMBER++ << "= add 0, " << Calc() << endl;
-    } else {
+    } else if(rslt.type==ValType::Var) {
         int depth = retValDepth(name);
         assert(depth > 0);
-        oss << "\t%" << NAME_NUMBER++ << "= load @COMPILER_" << name << "_" << depth << "_"
+        oss << "\t%" << NAME_NUMBER << "= load @COMPILER_" << name << "_" << depth << "_"
             << VALMAP_LEVELREC[depth - 1] << endl;
+//        cerr<<"NAME_NUMBER is "<<NAME_NUMBER<<endl<<"Current Statment is"<<oss.str()<<endl;
+        NAME_NUMBER++;
+    }
+    else{
+        cerr<<"unexpected lval_type"<<endl;
+        assert(0);
     }
 
     return oss.str();
@@ -481,23 +493,40 @@ string VarDefAST::DumpKoopa() const {
     // 记录当前深度用于处理变量名
     int depth = VAL_MAP.size();
     assert(depth > 0);
+    if(IsGlobal)
+        oss<<"global";
     string tmpname = name + "_" + to_string(depth) + "_" + to_string(VALMAP_LEVELREC[depth - 1]);
-    //一定是int
-    oss << "\t@COMPILER_" << tmpname << " = alloc i32" << endl;
+    //一定是int,默认初始化0(兼容全局变量)
+    oss << "\t@COMPILER_" << tmpname << " = alloc i32";
     unordered_map <string, symboltype> &lastMap = VAL_MAP.back();
-    if (value != nullptr) {
+    if(!IsGlobal){
+        if (value != nullptr) {
+            oss<<endl;
+            // 输出表达式的koopa
+            oss << value->DumpKoopa();
 
-        // 输出表达式的koopa
-        oss << value->DumpKoopa();
+            oss << "\tstore %" << NAME_NUMBER - 1 << ", @COMPILER_" << tmpname<<endl;
+            //将变量的字符存入表中
+            symboltype valstruct = {-7777777, ValType::Var};
+            lastMap[name] = valstruct;
+        } else {
+            //默认值，用于报警
+            symboltype valstruct = {-7777777, ValType::Var};
+            lastMap[name] = valstruct;
+        }
+    } else{
+        /// TODO: 可能存在bug
 
-        oss << "\tstore %" << NAME_NUMBER - 1 << ", @COMPILER_" << tmpname << endl;
-        //将变量的字符存入表中
-        symboltype valstruct = {-7777777, ValType::Var};
-        lastMap[name] = valstruct;
-    } else {
-        //默认值，用于报警
-        symboltype valstruct = {-7777777, ValType::Var};
-        lastMap[name] = valstruct;
+        if(value!= nullptr){
+            oss<<", "<<value->Calc()<<endl;
+            symboltype valstruct = {value->Calc(), ValType::Var};
+            lastMap[name] = valstruct;
+        }
+        else{
+            oss<<", zeroinit"<<endl;
+            symboltype valstruct = {0, ValType::Var};
+            lastMap[name] = valstruct;
+        }
     }
     if (next != nullptr)
         oss << next->DumpKoopa();
@@ -529,7 +558,8 @@ string FuncCallAST::DumpKoopa() const {
     assert(glob.count(*name.get()));
     symboltype tmp = glob[*name.get()];
     if (tmp.type == ValType::IntFuncname) {
-        oss << "\t%" << NAME_NUMBER++ << " = call @" << name->c_str();
+        oss << "\t%" << NAME_NUMBER << " = call @" << name->c_str();
+        NAME_NUMBER++;
     } else if (tmp.type == ValType::VoidFuncname) {
         oss << "\tcall @" << name->c_str();
     } else {
@@ -559,5 +589,11 @@ string FuncRParamsAST::DumpKoopa() const {
     }
 
     paramregnum.insert(paramregnum.end(), otherregnum.begin(), otherregnum.end());
+    return oss.str();
+}
+
+string GlobDeclAST::DumpKoopa() const {
+    ostringstream oss;
+    oss<<decllist->DumpKoopa();
     return oss.str();
 }

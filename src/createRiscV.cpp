@@ -51,7 +51,6 @@ void parse_string(const char *str) {
     // 释放 Koopa IR 程序占用的内存
     koopa_delete_program(program);
 
-    cout << "   .text" << endl;
 
     for (size_t i = 0; i < raw.funcs.len; ++i) {
         // 正常情况下, 列表中的元素就是函数, 我们只不过是在确认这个事实
@@ -59,7 +58,7 @@ void parse_string(const char *str) {
         assert(raw.funcs.kind == KOOPA_RSIK_FUNCTION);
         // 获取当前函数
         koopa_raw_function_t func = (koopa_raw_function_t) raw.funcs.buffer[i];
-
+        cout << "   .text" << endl;
         cout << "   .globl " << func->name + 1 << endl;
         //排除掉第一个@号
         cout << func->name + 1 << ":" << endl;
@@ -84,8 +83,8 @@ void parse_string(const char *str) {
 
             koopa_raw_basic_block_t bb = (koopa_raw_basic_block_t) func->bbs.buffer[j];
 
-            if(bb->name)
-                cout<<endl<<bb->name+1<<":"<<endl;
+            if (bb->name)
+                cout << endl << bb->name + 1 << ":" << endl;
             for (size_t k = 0; k < bb->insts.len; ++k) {
                 koopa_raw_value_t value = (koopa_raw_value_t) bb->insts.buffer[k];
 //                cerr << value->kind.tag << endl;
@@ -100,7 +99,8 @@ void parse_string(const char *str) {
                     BinVisit(value, sympol_map, stackIt);
                 } else if (value->kind.tag == KOOPA_RVT_RETURN) {
                     //这部分之后还要改，暂时用特例写死,认为ret的数据一定存在栈底
-                    cout << "\tlw a0, " << sympol_map[value->kind.data.ret.value]<< "(sp)" << endl;
+
+                    cout << "\tlw a0, " << sympol_map[value->kind.data.ret.value] << "(sp)" << endl;
                     //恢复现场
                     cout << "\taddi sp, sp, " << length * 4 << endl;
                     cout << "\tret" << endl;
@@ -119,9 +119,12 @@ void parse_string(const char *str) {
                     //不处理，store的时候才真的存这个数
                     continue;
                 } else if (value->kind.tag == KOOPA_RVT_BRANCH) {
-                    BranchVisit(value,sympol_map);
+                    BranchVisit(value, sympol_map);
                 } else if (value->kind.tag == KOOPA_RVT_JUMP) {
-                    JumpVisit(value,sympol_map);
+                    JumpVisit(value, sympol_map);
+
+                } else if (value->kind.tag == KOOPA_RVT_CALL) {
+                    CallVisit(value, stackIt);
                 } else {
                     cerr << "unexpected statement, type is: " << value->kind.tag << endl;
                     assert(0);
@@ -291,6 +294,13 @@ void StoreVisit(const koopa_raw_value_t &obj, unordered_map<koopa_raw_value_t, i
     } else if (value->kind.tag == KOOPA_RVT_BINARY) {
         assert(mymap.find(value) != mymap.end());
         cout << "\tlw t0, " << mymap[value] << "(sp)" << endl;
+    } else if (value->kind.tag == KOOPA_RVT_FUNC_ARG_REF) {
+        koopa_raw_func_arg_ref_t arg = sto_value->kind.data.func_arg_ref;
+        if (arg.index < 8)
+            cout << "   mv t0, a" << arg.index << endl;
+        else {
+
+        }
     } else {
         cerr << "unexpected type,type tag is:" << value->kind.tag << endl;
         assert(0);
@@ -306,23 +316,53 @@ void StoreVisit(const koopa_raw_value_t &obj, unordered_map<koopa_raw_value_t, i
     cout << "\tsw t0, " << mymap[dest] << "(sp)" << endl;
 }
 
-void BranchVisit(const koopa_raw_value_t& obj,unordered_map<koopa_raw_value_t , int>& mymap){
+void BranchVisit(const koopa_raw_value_t &obj, unordered_map<koopa_raw_value_t, int> &mymap) {
     //branch和jump指令就用t3寄存器
     const koopa_raw_branch_t bran = obj->kind.data.branch;
-    cout<<"\tlw t3, "<<mymap[bran.cond]<<"(sp)"<<endl;
+    cout << "\tlw t3, " << mymap[bran.cond] << "(sp)" << endl;
 
     // 由于beqz只能跳转12位立即数的地方，范围不能太大。因此先跳到标签再从标签跳出去
-    cout<<"\tbeqz t3, "<<bran.false_bb->name+1<<"_trans"<<endl;
-    cout<<"\tbnez t3, "<<bran.true_bb->name+1<<"_trans"<<endl;
+    cout << "\tbeqz t3, " << bran.false_bb->name + 1 << "_trans" << endl;
+    cout << "\tbnez t3, " << bran.true_bb->name + 1 << "_trans" << endl;
 
-    cout<<endl<<bran.false_bb->name+1<<"_trans:"<<endl;
-    cout<<"\tj "<<bran.false_bb->name+1<<endl;
-    cout<<endl<<bran.true_bb->name+1<<"_trans:"<<endl;
-    cout<<"\tj "<<bran.true_bb->name+1<<endl;
+    cout << endl << bran.false_bb->name + 1 << "_trans:" << endl;
+    cout << "\tj " << bran.false_bb->name + 1 << endl;
+    cout << endl << bran.true_bb->name + 1 << "_trans:" << endl;
+    cout << "\tj " << bran.true_bb->name + 1 << endl;
 }
 
-void JumpVisit(const koopa_raw_value_t& obj,unordered_map<koopa_raw_value_t , int>& mymap){
+void JumpVisit(const koopa_raw_value_t &obj, unordered_map<koopa_raw_value_t, int> &mymap) {
     const koopa_raw_jump_t jum = obj->kind.data.jump;
-    cout<<"\tj "<<jum.target->name+1<<endl;
-    cout<<endl;
+    cout << "\tj " << jum.target->name + 1 << endl;
+    cout << endl;
+}
+
+void CallVisit(const koopa_raw_value_t &obj, int &st) {
+    koopa_raw_function_t func = value->kind.data.call.callee;
+    koopa_raw_slice_t args = value->kind.data.call.args;
+    int nowst = 0;
+    for (int i = 1; i <= args.len; i++) {
+        if (M.find((ull) (args.buffer[i - 1])) != M.end()) {
+            if (i <= 8) {
+                cout << "   li t4, " << M[(ull) (args.buffer[i - 1])] << endl;
+                cout << "   add t4, t4, sp" << endl;
+                cout << "   lw a" << i - 1 << ", (t4)" << endl;
+            } else {
+                cout << "   li t4, " << M[(ull) args.buffer[i - 1]] << endl;
+                cout << "   add t4, t4, sp" << endl;
+                cout << "   lw t0, (t4)" << endl;
+                cout << "   li t4, " << nowst << endl;
+                cout << "   add t4, t4, sp" << endl;
+                cout << "   sw t0, (t4)" << endl;
+                nowst += 4;
+            }
+        }
+
+    }
+    cout << "   call " << func->name + 1 << endl;
+    M[(ull) value] = st;
+    st += 4;
+    cout << "   li t4, " << M[(ull) value] << endl;
+    cout << "   add t4, t4, sp" << endl;
+    cout << "   sw a0, (t4)" << endl;
 }
