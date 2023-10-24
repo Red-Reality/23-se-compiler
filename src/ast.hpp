@@ -9,6 +9,7 @@
 #include <vector>
 #include <cassert>
 #include "symbollist.h"
+
 using namespace std;
 // 所有 AST 的基类
 
@@ -17,7 +18,7 @@ using namespace std;
 template<typename T>
 using point = std::unique_ptr<T>;
 
-
+/// TODO:为全局变量实现新的ast，复用ast会导致识别有二义性
 class BaseAST {
 public:
     virtual ~BaseAST() = default;
@@ -33,6 +34,14 @@ public:
         cerr<<"Not Implied Calc,unexcept situation may be occur"<<endl;
         return 0;
     }
+    virtual string ExtraOutput() const{
+        cerr<<"this function should not be called in default,please check if you have overriden the function"<<endl;
+        assert(0);
+    }
+    virtual vector<int>CommunicateIntVector() const{
+        cerr<<"this function should not be used unless it is overriden"<<endl;
+        assert(0);
+    }
 };
 
 // CompUnit 是 BaseAST
@@ -40,7 +49,7 @@ class CompUnitAST : public BaseAST {
 public:
     // 用智能指针管理对象
     std::unique_ptr <BaseAST> func_def;
-
+    point<BaseAST> next;
     CompUnitAST(std::unique_ptr <BaseAST> &_func_def) {
         func_def = std::move(_func_def);
     }
@@ -56,6 +65,7 @@ public:
     std::unique_ptr <BaseAST> func_type;
     std::string ident;
     std::unique_ptr <BaseAST> block;
+    point<BaseAST> FuncFParams;
 
     FuncDefAST(std::unique_ptr <BaseAST> &_func_type, const char *_ident, std::unique_ptr <BaseAST> &_block)
             : ident(_ident) {
@@ -74,12 +84,52 @@ public:
     std::string name;
 
     FuncTypeAST(const char *_name) : name(_name) {}
-
+    FuncTypeAST(){
+        ;
+    }
     std::string DumpAST() const override;
 
     std::string DumpKoopa() const override;
 };
 
+class FuncFParamsAST:public BaseAST{
+public:
+    point<string> name;
+    point<BaseAST> next;
+    FuncFParamsAST(){
+        ;
+    }
+    string DumpKoopa() const override;
+    string ExtraOutput() const override;
+};
+
+class FuncCallAST:public BaseAST{
+public:
+    point<string> name;
+    point<BaseAST> paramlist;
+    FuncCallAST(){
+        ;
+    }
+    string DumpKoopa() const override;
+};
+
+class FuncRParamsAST: public BaseAST{
+public:
+    point<BaseAST>exp;
+    point<BaseAST>next;
+    mutable vector<int> paramregnum;
+    FuncRParamsAST(){
+        ;
+    }
+    vector<int> CommunicateIntVector() const override{
+        return paramregnum;
+    };
+    void pushback_paramregnum(int num){
+        paramregnum.push_back(num);
+    }
+    string DumpKoopa() const override;
+
+};
 
 class BlockAST : public BaseAST {
 public:
@@ -204,7 +254,8 @@ public:
 enum class UnaryOp{
     Positive=0,
     Negative,
-    LogicalFalse
+    LogicalFalse,
+    FunctionCall
 };
 class UnaryExpAST :public BaseAST{
 public:
@@ -215,6 +266,10 @@ public:
     UnaryExpAST(std::unique_ptr<BaseAST> &_u_exp,UnaryOp _type = UnaryOp::Positive){
         u_exp = std::move(_u_exp);
         type = _type;
+    }
+
+    UnaryExpAST(){
+        ;
     }
 
     std::string DumpAST() const override;
@@ -229,6 +284,9 @@ public:
                 return -u_exp->Calc();
             case UnaryOp::LogicalFalse:
                 return !u_exp->Calc();
+            default:
+                cerr<<"unexpected unaryop, failed"<<endl;
+                assert(0);
         }
     }
 };
@@ -505,6 +563,7 @@ public:
     string name;
     point<BaseAST> value;
     point<BaseAST> next;
+    bool IsGlobal = false;
 
     VarDefAST(string _name, point<BaseAST>& _value){
         name = _name;
@@ -529,4 +588,14 @@ public:
         ;
     }
     string  DumpKoopa() const override;
+};
+
+class GlobDeclAST:public BaseAST{
+public:
+    point<BaseAST> decllist;
+    bool IsConst;
+    GlobDeclAST(){
+        ;
+    }
+    string DumpKoopa() const override;
 };

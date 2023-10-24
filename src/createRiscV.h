@@ -25,3 +25,5 @@ void BranchVisit(const koopa_raw_value_t& obj,unordered_map<koopa_raw_value_t , 
 
 //处理jump语句
 void JumpVisit(const koopa_raw_value_t& obj,unordered_map<koopa_raw_value_t , int>& mymap);
+
+void CallVisit(const koopa_raw_value_t& obj,unordered_map<koopa_raw_value_t , int>& mymap,int&st);

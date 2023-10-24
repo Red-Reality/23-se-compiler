@@ -5,6 +5,10 @@
 
 using namespace std;
 
+/// 常量符号表，用于记录已声明的常量符号
+/// 为了保证第五部分的作用域，每个block拥有一个unorder map
+vector<unordered_map<string,symboltype>> VAL_MAP;
+
 /// 检查符号表是否有值
 bool HasName(vector <unordered_map<string, symboltype>> &sel_map, const string &name) {
 
@@ -57,4 +61,31 @@ void SetValue(vector <unordered_map<string, symboltype>> &sel_map, const string 
         }
     }
     assert(0);
+}
+
+void VALMAP_push(){
+    VAL_MAP.push_back(unordered_map<string, symboltype>());
+    if(VAL_MAP.size()>VALMAP_LEVELREC.size()){
+        //说明要加一层
+        VALMAP_LEVELREC.push_back(0);
+    } else{
+        assert(!VALMAP_LEVELREC.empty());
+        VALMAP_LEVELREC[VAL_MAP.size()-1]++;
+    }
+}
+
+int retValDepth(string name) {
+    int depth = VAL_MAP.size();
+    for (auto it = VAL_MAP.rbegin(); it != VAL_MAP.rend(); it++) {
+        unordered_map <string, symboltype> &tmpmap = *it;
+        if (tmpmap.find(name) != tmpmap.end()) {
+            break;
+        } else {
+            depth--;
+        }
+    }
+    if (depth <= 0) {
+        warnerror(VAL_MAP, name);
+    }
+    return depth;
 }

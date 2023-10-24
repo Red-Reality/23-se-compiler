@@ -24,6 +24,7 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 // 定义 parser 函数和错误处理函数的附加参数
 %parse-param { std::unique_ptr<BaseAST> &ast }
 
+%start StartExpression
 // yylval 的定义, 我们把它定义成了一个联合体 (union)
 // 因为 token 的值有的是字符串指针, 有的是整数
 // 之前我们在 lexer 中用到的 str_val 和 int_val 就是在这里被定义的
@@ -34,7 +35,6 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
     BlockItemAST *blk_val;
     ConstDefAST *cdf_val;
     VarDefAST *vdf_val;
-    ASTList   *lst_val;
 }
 
 // lexer 返回的所有 token 种类的声明
@@ -44,75 +44,128 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
-%type <ast_val> FuncDef FuncType Block Stmt Number
+%type <ast_val> FuncDef Block Stmt Number CompUnit GlobDecl
                 Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
                 Decl LVal  ConstInitVal ConstExp InitVal LEVal FinalStmt NotFinalStmt ConBre
-                FuncPara FuncExp FuncExpPara
+                FuncFParamList FuncRParams
 
-
+%type <str_val> FuncFParam
 %type <blk_val> BlockItemList BlockItem
 %type <cdf_val> ConstDefList ConstDef ConstDecl
-%type <vdf_val> VarDecl VarDefList VarDef
-%type <lst_val> FuncParaList FuncExpParaList CompUnitList
+%type <vdf_val> VarDecl VarDefList VarDef GlobVarList
+
 %%
 
-// 开始符, CompUnit ::= FuncDef, 大括号后声明了解析完成后 parser 要做的事情
-// $1 指代规则里第一个符号的返回值, 也就是 FuncDef 的返回值
+StartExpression
+    : CompUnit{
+        auto compunit = point<BaseAST>($1);
+        ast = std::move(compunit);
+    }
 CompUnit
     : FuncDef {
         auto func = std::unique_ptr<BaseAST>($1);
-        $$ = new CompUnitAST(func);
+        auto compast = new CompUnitAST(func);
+
+        $$ = compast;
     }
-    | Decl{
-        auto astp = point<BaseAST>($1);
-        $$ = new CompUnitAST(
+    | FuncDef CompUnit{
+        auto func = std::unique_ptr<BaseAST>($1);
+        auto compast = new CompUnitAST(func);
+        compast->next = point<BaseAST>($2);
+
+        $$ = compast;
+    }
+    | GlobDecl{
+        auto decl = point<BaseAST>($1);
+        auto compast = new CompUnitAST(decl);
+        $$ = compast;
+    }
+    | GlobDecl CompUnit{
+        auto decl = point<BaseAST>($1);
+        auto compast = new CompUnitAST(decl);
+        compast->next = point<BaseAST>($2);
+        $$ = compast;
     }
     ;
-
+GlobDecl
+    : ConstDecl{
+        auto ast = new GlobDeclAST();
+        ast->decllist = point<BaseAST>($1);
+        ast->IsConst = true;
+        $$ = ast;
+    }
+    | INT GlobVarList ';'{
+        auto ast = new GlobDeclAST();
+        ast->decllist = point<BaseAST>($2);
+        ast->IsConst = false;
+        $$ = ast;
+    }
+    ;
+GlobVarList
+    : VarDef{
+        auto ast = $1;
+        ast->IsGlobal = true;
+        $$ = ast;
+    }
+    | VarDef ',' GlobVarList{
+        auto ast = $1;
+        ast->next = point<BaseAST>($3);
+        ast->IsGlobal = true;
+        $$ = ast;
+    }
 // FuncDef ::= FuncType IDENT '(' ')' Block;
 // $$ 表示非终结符的返回值, 我们可以通过给这个符号赋值的方法来返回结果
 FuncDef
-    : FuncType IDENT '(' ')' Block {
-        auto type = std::unique_ptr<BaseAST>($1);
+    : INT IDENT '(' ')' Block {
+        auto tmp =new FuncTypeAST("int");
+        auto type = point<BaseAST>(tmp);
         auto ident = std::unique_ptr<std::string>($2);
         auto block = std::unique_ptr<BaseAST>($5);
         $$ = new FuncDefAST(type, ident->c_str(), block);
     }
-    | FuncType IDENT '(' FuncParaList ')' Block{
-        auto ast = new FuncDefAST();
-        ast->func_type = std::unique_ptr<BaseAST>($1);
-        ast->ident = std::unique_ptr<std::string>($2)->c_str();
-        ast->block = std::unique_ptr<BaseAST>($6);
-        ast->params = point<ASTList>($4);
+    | INT IDENT '(' FuncFParamList ')' Block{
+        auto tmp =new FuncTypeAST("int");
+        auto type = point<BaseAST>(tmp);
+        auto ident = std::unique_ptr<std::string>($2);
+        auto block = std::unique_ptr<BaseAST>($6);
+        auto ast = new FuncDefAST(type, ident->c_str(), block);
+        ast->FuncFParams = point<BaseAST>($4);
         $$ = ast;
     }
+    | VOID IDENT '(' FuncFParamList ')' Block{
+        auto tmp =new FuncTypeAST("void");
+        auto type = point<BaseAST>(tmp);
+        auto ident = std::unique_ptr<std::string>($2);
+        auto block = std::unique_ptr<BaseAST>($6);
+        auto ast = new FuncDefAST(type, ident->c_str(), block);
+        ast->FuncFParams = point<BaseAST>($4);
+        $$ = ast;
+    }
+    | VOID IDENT '(' ')' Block {
+        auto tmp = new FuncTypeAST("void");
+        auto type = point<BaseAST>(tmp);
+        auto ident = std::unique_ptr<std::string>($2);
+        auto block = std::unique_ptr<BaseAST>($5);
+        $$ = new FuncDefAST(type, ident->c_str(), block);
+    }
     ;
-
-FuncParaList
-    : FuncPara{
-        $$ = new ASTList();
-        $$->val = point<BaseAST>($1);
+FuncFParamList
+    : FuncFParam{
+        auto ast = new FuncFParamsAST();
+        ast->name = point<string>($1);
+        $$ = ast;
     }
-    | FuncPara ',' FuncParaList{
-        $$ =new ASTList();
-        $$->next = point<BaseAST>($3);
-        $$->val = point<BaseAST>($1);
+    | FuncFParam ',' FuncFParamList{
+        auto ast = new FuncFParamsAST();
+        ast->name = point<string>($1);
+        ast->next = point<BaseAST>($3);
+        $$ = ast;
     }
-FuncPara
+FuncFParam
     : INT IDENT{
-        auto ast = new FuncPara();
-        ast->name = point<std::string>($2)->c_str();
-        $$ = ast;
+        $$ = $2;
     }
-// 同上, 不再解释
-FuncType
-    : INT {
-        $$ = new FuncTypeAST("int");
-    }
-    | VOID{
-        $$ = new FuncTypeAST("void");
-    }
-    ;
+
 
 Block
     : '{' BlockItemList '}' {
@@ -326,9 +379,26 @@ PrimaryExp
     ;
 
 UnaryExp
-    : PrimaryExp{
+    : IDENT '(' ')'{
+         auto func = new FuncCallAST();
+         func->name = point<string>($1);
+         auto ast = new UnaryExpAST();
+         ast->u_exp = point<BaseAST>(func);
+         ast->type = UnaryOp::FunctionCall;
+         $$ = ast;
+    }
+    | IDENT '(' FuncRParams ')'{
+         auto func = new FuncCallAST();
+         func->name = point<string>($1);
+         func->paramlist = point<BaseAST>($3);
+         auto ast = new UnaryExpAST();
+         ast->u_exp = point<BaseAST>(func);
+         ast->type = UnaryOp::FunctionCall;
+         $$ = ast;
+    }
+    |PrimaryExp{
         auto primaryexp = std::unique_ptr<BaseAST>($1);
-        $$ = new PrimaryExpAST(primaryexp);
+        $$ = new UnaryExpAST(primaryexp);
     }
     | '+' UnaryExp{
         auto unaryexp = std::unique_ptr<BaseAST>($2);
@@ -342,39 +412,20 @@ UnaryExp
         auto unaryexp = std::unique_ptr<BaseAST>($2);
         $$ = new UnaryExpAST(unaryexp,UnaryOp::LogicalFalse);
     }
-    | FuncExp{
-        auto astpoint = point<BaseAST>($1);
-        $$ = new UnaryExpAST(astpoint,UnaryOp::Function);
-    }
     ;
-FuncExp
-    : IDENT '(' ')'{
-        auto ast = new FuncExpAST();
-        ast->name = point<string>($1)->c_str();
+
+
+
+FuncRParams
+    : Exp {
+        auto ast = new FuncRParamsAST();
+        ast->exp = point<BaseAST>($1);
         $$ = ast;
     }
-    | IDENT '(' FuncExpParaList ')'{
-        auto ast = new FuncExpAST();
-        ast->name = point<string>($1)->c_str();
-        ast->params = point<ASTList>($3);
-    }
-    ;
-FuncExpParaList
-    : FuncExpPara{
-        auto ast = new ASTList();
-        ast->val = point<BaseAST>($1);
-        $$ = ast;
-    }
-    | FuncExpPara ',' FuncExpParaList{
-        auto ast = new ASTList();
-        ast->next = point<ASTList>($3);
-        ast->val = point<ASTList>($1);
-    }
-    ;
-FuncExpPara
-    : IDENT{
-        auto ast = new FuncExpParamAST();
-        ast->paramname = point<string>($1);
+    | Exp ',' FuncRParams{
+        auto ast = new FuncRParamsAST();
+        ast->exp = point<BaseAST>($1);
+        ast->next = point<BaseAST>($3);
         $$ = ast;
     }
 MulExp
