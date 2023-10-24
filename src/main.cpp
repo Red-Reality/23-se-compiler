@@ -6,7 +6,7 @@
 #include "iostream"
 #include <fstream>
 #include "cstring"
-
+#include "sstream"
 #include "ast.hpp"
 #include "createRiscV.h"
 #include "symbollist.h"
@@ -16,18 +16,30 @@ using namespace std;
 extern FILE *yyin;
 extern int yyparse(std::unique_ptr<BaseAST> &ast);
 
-void prepare(){
+string prepare(int t){
+    ostringstream oss;
     // 初始化时先存入全局符号表
     VALMAP_push();
 
+    if(t){
+        cout<<"decl @getint(): i32"<<endl;
+        cout<<"decl @getch(): i32"<<endl;
+        cout<<"decl @getarray(*i32): i32"<<endl;
+        cout<<"decl @putint(i32)"<<endl;
+        cout<<"decl @putch(i32)"<<endl;
+        cout<<"decl @putarray(i32, *i32)"<<endl;
+        cout<<endl<<endl;
+    }
+    else{
+        oss<<"decl @getint(): i32"<<endl;
+        oss<<"decl @getch(): i32"<<endl;
+        oss<<"decl @getarray(*i32): i32"<<endl;
+        oss<<"decl @putint(i32)"<<endl;
+        oss<<"decl @putch(i32)"<<endl;
+        oss<<"decl @putarray(i32, *i32)"<<endl;
+        oss<<endl<<endl;
+    }
     //初始化库函数
-    cout<<"decl @getint(): i32"<<endl;
-    cout<<"decl @getch(): i32"<<endl;
-    cout<<"decl @getarray(*i32): i32"<<endl;
-    cout<<"decl @putint(i32)"<<endl;
-    cout<<"decl @putch(i32)"<<endl;
-    cout<<"decl @putarray(i32, *i32)"<<endl;
-    cout<<endl<<endl;
 
     //插入库函数名
     unordered_map<string,symboltype>& last = VAL_MAP[0];
@@ -37,6 +49,10 @@ void prepare(){
     last["putint"] = {-3333333,ValType::VoidFuncname};
     last["putch"] = {-3333333,ValType::VoidFuncname};
     last["putarray"] = {-3333333,ValType::VoidFuncname};
+    if(t)
+        return "";
+    else
+        return oss.str();
 }
 int main(int argc, const char *argv[])
 {
@@ -62,7 +78,7 @@ int main(int argc, const char *argv[])
     {
         freopen(output,"w",stdout);
 
-        prepare();
+        prepare(1);
         cout<<ast->DumpKoopa()<<endl;
 
         return 0;
@@ -70,8 +86,9 @@ int main(int argc, const char *argv[])
     else if (strcmp(mode,"-riscv")==0){
 
         freopen(output,"w",stdout);
-
-        parse_string(ast->DumpKoopa().c_str());
+        ostringstream oss;
+        oss<<prepare(0)<<ast->DumpKoopa().c_str();
+        parse_string(oss.str().c_str());
 
         return 0;
     }
