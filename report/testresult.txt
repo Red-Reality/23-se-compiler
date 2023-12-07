@@ -1,0 +1,96 @@
+make: Entering directory '/root/compiler'
+mkdir -p /tmp/tmp2quh4esx/
+flex  -o /tmp/tmp2quh4esx/sysy.lex.cpp /root/compiler/src/sysy.l
+mkdir -p /tmp/tmp2quh4esx/
+bison -d -o /tmp/tmp2quh4esx/sysy.tab.cpp /root/compiler/src/sysy.y
+mkdir -p /tmp/tmp2quh4esx/
+clang++ -I/root/compiler/src -I/root/compiler/src/.idea -I/tmp/tmp2quh4esx -I/tmp/tmp2quh4esx/.idea -MMD -MP -Wall -Wno-register -std=c++17 -O2 -I/opt/include -c /tmp/tmp2quh4esx/sysy.lex.cpp -o /tmp/tmp2quh4esx/sysy.lex.cpp.o
+mkdir -p /tmp/tmp2quh4esx/
+clang++ -I/root/compiler/src -I/root/compiler/src/.idea -I/tmp/tmp2quh4esx -I/tmp/tmp2quh4esx/.idea -MMD -MP -Wall -Wno-register -std=c++17 -O2 -I/opt/include -c /tmp/tmp2quh4esx/sysy.tab.cpp -o /tmp/tmp2quh4esx/sysy.tab.cpp.o
+mkdir -p /tmp/tmp2quh4esx/
+clang++ -I/root/compiler/src -I/root/compiler/src/.idea -I/tmp/tmp2quh4esx -I/tmp/tmp2quh4esx/.idea -MMD -MP -Wall -Wno-register -std=c++17 -O2 -I/opt/include -c /root/compiler/src/ast.cpp -o /tmp/tmp2quh4esx/ast.cpp.o
+mkdir -p /tmp/tmp2quh4esx/
+clang++ -I/root/compiler/src -I/root/compiler/src/.idea -I/tmp/tmp2quh4esx -I/tmp/tmp2quh4esx/.idea -MMD -MP -Wall -Wno-register -std=c++17 -O2 -I/opt/include -c /root/compiler/src/createRiscV.cpp -o /tmp/tmp2quh4esx/createRiscV.cpp.o
+mkdir -p /tmp/tmp2quh4esx/
+clang++ -I/root/compiler/src -I/root/compiler/src/.idea -I/tmp/tmp2quh4esx -I/tmp/tmp2quh4esx/.idea -MMD -MP -Wall -Wno-register -std=c++17 -O2 -I/opt/include -c /root/compiler/src/IfElseAst.cpp -o /tmp/tmp2quh4esx/IfElseAst.cpp.o
+mkdir -p /tmp/tmp2quh4esx/
+clang++ -I/root/compiler/src -I/root/compiler/src/.idea -I/tmp/tmp2quh4esx -I/tmp/tmp2quh4esx/.idea -MMD -MP -Wall -Wno-register -std=c++17 -O2 -I/opt/include -c /root/compiler/src/main.cpp -o /tmp/tmp2quh4esx/main.cpp.o
+mkdir -p /tmp/tmp2quh4esx/
+clang++ -I/root/compiler/src -I/root/compiler/src/.idea -I/tmp/tmp2quh4esx -I/tmp/tmp2quh4esx/.idea -MMD -MP -Wall -Wno-register -std=c++17 -O2 -I/opt/include -c /root/compiler/src/symbollist.cpp -o /tmp/tmp2quh4esx/symbollist.cpp.o
+clang++ /tmp/tmp2quh4esx/sysy.lex.cpp.o /tmp/tmp2quh4esx/sysy.tab.cpp.o /tmp/tmp2quh4esx/ast.cpp.o /tmp/tmp2quh4esx/createRiscV.cpp.o /tmp/tmp2quh4esx/IfElseAst.cpp.o /tmp/tmp2quh4esx/main.cpp.o /tmp/tmp2quh4esx/symbollist.cpp.o  -L/opt/lib/native -lkoopa -lpthread -ldl -o /tmp/tmp2quh4esx/compiler
+make: Leaving directory '/root/compiler'
+running test "lv1/0_main" ... PASSED
+running test "lv1/1_comments" ... PASSED
+running test "lv1/2_int_dec" ... PASSED
+running test "lv1/3_int_oct" ... PASSED
+running test "lv1/4_int_hex" ... PASSED
+running test "lv1/5_compact" ... PASSED
+running test "lv1/6_whitespaces" ... PASSED
+running test "lv3/00_pos" ... PASSED
+running test "lv3/01_neg_0" ... PASSED
+running test "lv3/02_neg_2" ... PASSED
+running test "lv3/03_neg_max" ... PASSED
+running test "lv3/04_not_0" ... PASSED
+running test "lv3/05_not_10" ... PASSED
+running test "lv3/06_complex_unary" ... PASSED
+running test "lv3/07_add" ... PASSED
+running test "lv3/08_add_neg" ... PASSED
+running test "lv3/09_sub" ... PASSED
+running test "lv3/10_sub_neg" ... PASSED
+running test "lv3/11_mul" ... PASSED
+running test "lv3/12_mul_neg" ... PASSED
+running test "lv3/13_div" ... PASSED
+running test "lv3/14_div_neg" ... PASSED
+running test "lv3/15_mod" ... PASSED
+running test "lv3/16_mod_neg" ... PASSED
+running test "lv3/17_lt" ... PASSED
+running test "lv3/18_gt" ... PASSED
+running test "lv3/19_le" ... PASSED
+running test "lv3/20_ge" ... PASSED
+running test "lv3/21_eq" ... PASSED
+running test "lv3/22_ne" ... PASSED
+running test "lv3/23_lor" ... PASSED
+running test "lv3/24_land" ... PASSED
+running test "lv3/25_int_min" ... PASSED
+running test "lv3/26_parentheses" ... PASSED
+running test "lv3/27_complex_binary" ... PASSED
+running test "lv4/00_const" ... PASSED
+running test "lv4/01_const_expr" ... PASSED
+running test "lv4/02_multiple_consts" ... PASSED
+running test "lv4/03_complex_const" ... PASSED
+running test "lv4/04_var" ... PASSED
+running test "lv4/05_var_init" ... PASSED
+running test "lv4/06_var_expr" ... PASSED
+running test "lv4/07_var_main" ... PASSED
+running test "lv4/08_multiple_vars" ... PASSED
+running test "lv4/09_complex_vars" ... PASSED
+running test "lv4/10_assign" ... PASSED
+running test "lv4/11_assign_read" ... PASSED
+running test "lv4/12_multiple_assigns" ... PASSED
+running test "lv4/13_complex" ... PASSED
+running test "lv5/0_block" ... PASSED
+running test "lv5/1_ret_from_block" ... PASSED
+running test "lv5/2_blocks" ... PASSED
+running test "lv5/3_exp" ... PASSED
+running test "lv5/4_empty_exp" ... PASSED
+running test "lv5/5_scope" ... PASSED
+running test "lv5/6_complex_scopes" ... PASSED
+running test "lv6/0_if" ... PASSED
+running test "lv6/1_if_else" ... PASSED
+running test "lv6/2_multiple_if_else" ... PASSED
+running test "lv6/3_nested_if" ... PASSED
+running test "lv6/4_logical" ... PASSED
+running test "lv6/5_more_logical" ... PASSED
+running test "lv6/6_multiple_returns" ... PASSED
+running test "lv6/7_complex" ... PASSED
+running test "lv7/00_while" ... PASSED
+running test "lv7/01_while_pow" ... PASSED
+running test "lv7/02_while_false" ... PASSED
+running test "lv7/03_while_true" ... PASSED
+running test "lv7/04_while_if" ... PASSED
+running test "lv7/05_if_while" ... PASSED
+running test "lv7/06_nested_while" ... PASSED
+running test "lv7/07_break" ... PASSED
+running test "lv7/08_if_break" ... PASSED
+running test "lv7/09_continue" ... PASSED
+running test "lv7/10_if_continue" ... PASSED
