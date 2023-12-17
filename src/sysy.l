@@ -33,13 +33,22 @@ Hexadecimal   0[xX][0-9a-fA-F]+
 {WhiteSpace}    { /* 忽略, 不做任何操作 */ }
 {LineComment}   { /* 忽略, 不做任何操作 */ }
 {BlockComment}  { /* 忽略, 不做任何操作 */ }
-
+"PROGRAM"       { return Program;}
+"BEGIN"         { /* 忽略, 不做任何操作 */}
+":="            { return SETVAL;}
+"END"           { /* 忽略, 不做任何操作 */}
+"DO"            { return Do;}
+"VAL"           { return INT; }
 "int"           { return INT; }
+"THEN"          { return Then;}
 "return"        { return RETURN; }
-"const"         { return CONST; }
-"if"            { return IF;}
+"CONST"         { return Const; }
+"const"         { return Const; }
+"if"            { return If;}
 "else"          { return ELSE;}
-"while"         { return WHILE; }
+
+"while"         { return While; }
+"WHILE"         { return While; }
 "break"         { return BREAK; }
 "continue"      { return CONTINUE; }
 "void"          { return VOID; }
@@ -58,6 +67,7 @@ Hexadecimal   0[xX][0-9a-fA-F]+
 "!="            { return NEQ; }
 ">="            { return GEQ; }
 "<="            { return LEQ; }
+
 
 
 .               { return yytext[0]; }

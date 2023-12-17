@@ -39,7 +39,7 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN CONST IF ELSE WHILE BREAK CONTINUE VOID
+%token INT RETURN Const If ELSE While BREAK CONTINUE VOID Program Then Do SETVAL
 %token <str_val> IDENT LOR LAND EQ NEQ GEQ LEQ
 %token <int_val> INT_CONST
 
@@ -148,6 +148,14 @@ FuncDef
         auto block = std::unique_ptr<BaseAST>($5);
         $$ = new FuncDefAST(type, ident->c_str(), block);
     }
+    | Program IDENT BlockItemList{
+        auto tmp = new FuncTypeAST("void");
+        auto type = point<BaseAST>(tmp);
+        auto ident = std::unique_ptr<std::string>($2);
+        auto block = std::unique_ptr<BaseAST>($3);
+        $$ = new FuncDefAST(type, ident->c_str(), block);
+
+    }
     ;
 FuncFParamList
     : FuncFParam{
@@ -185,6 +193,7 @@ BlockItemList
         auto list = std::unique_ptr<BlockItemAST>($2);
         auto stmt = $1;
         stmt->AddItem(list);
+
         $$ = stmt;
     }
 BlockItem
@@ -192,20 +201,29 @@ BlockItem
     Decl{
         auto decl = std::unique_ptr<BaseAST>($1);
         $$ = new BlockItemAST(decl);
+
     }
     |Stmt{
         auto stmt = std::unique_ptr<BaseAST>($1);
         $$ = new BlockItemAST(stmt);
+
     }
 
+
+
 // 把stmt 拆成后续没有嵌套的stmt和有嵌套的stmt,FinalStmt是所有后面不出现else的stmt，NotFinalStmt是可以在后面出现else的stmt
-Stmt : FinalStmt|NotFinalStmt;
+Stmt : FinalStmt|NotFinalStmt
 FinalStmt
     : RETURN Exp ';' {
         auto exp = std::unique_ptr<BaseAST>($2);
         $$ = new StmtAST(exp);
     }
     | LEVal '=' Exp ';'{
+        auto lval = std::unique_ptr<BaseAST>($1);
+        auto exp = std::unique_ptr<BaseAST>($3);
+        $$ = new StmtAST(exp,lval);
+    }
+    | LEVal SETVAL Exp ';'{
         auto lval = std::unique_ptr<BaseAST>($1);
         auto exp = std::unique_ptr<BaseAST>($3);
         $$ = new StmtAST(exp,lval);
@@ -220,6 +238,7 @@ FinalStmt
         auto stmt = new StmtAST();
         stmt->type = StmtType::OneExp;
         stmt->num = std::unique_ptr<BaseAST>($1);
+
         $$ = stmt;
     }
     | ';'{
@@ -227,14 +246,14 @@ FinalStmt
         stmt->type = StmtType::NoExp;
         $$ = stmt;
     }
-    | IF '(' Exp ')' FinalStmt ELSE FinalStmt{
+    | If '(' Exp ')' FinalStmt ELSE FinalStmt{
         auto ast = new IfElseAST();
         ast->sequence = point<BaseAST>($3);
         ast->ifexp = point<BaseAST>($5);
         ast->elseexp = point<BaseAST>($7);
         $$ = ast;
     }
-    | WHILE '(' Exp ')' FinalStmt{
+    | While '(' Exp ')' FinalStmt{
         auto ast = new WhileAST();
         ast->condition = point<BaseAST>($3);
         ast->stmt = point<BaseAST>($5);
@@ -242,6 +261,18 @@ FinalStmt
     }
     | ConBre{
         $$ = $1;
+    }
+    | While Exp Do Stmt{
+        auto ast = new WhileAST();
+        ast->condition = point<BaseAST>($2);
+        ast->stmt = point<BaseAST>($4);
+        $$ = ast;
+    }
+    | If Exp Then Stmt{
+        auto ast = new IfElseAST();
+        ast->sequence = point<BaseAST>($2);
+        ast->ifexp = point<BaseAST>($4);
+        $$ = ast;
     }
     ;
 ConBre
@@ -258,20 +289,20 @@ ConBre
     ;
 
 NotFinalStmt
-    : IF '(' Exp ')' Stmt{
+    : If '(' Exp ')' Stmt{
         auto ast = new IfElseAST();
         ast->sequence = point<BaseAST>($3);
         ast->ifexp = point<BaseAST>($5);
         $$ = ast;
     }
-    | IF '(' Exp ')' FinalStmt ELSE NotFinalStmt{
+    | If '(' Exp ')' FinalStmt ELSE NotFinalStmt{
         auto ast = new IfElseAST();
         ast->sequence = point<BaseAST>($3);
         ast->ifexp = point<BaseAST>($5);
         ast->elseexp = point<BaseAST>($7);
         $$ = ast;
     }
-    | WHILE '(' Exp ')' NotFinalStmt{
+    | While '(' Exp ')' NotFinalStmt{
         auto ast = new WhileAST();
         ast->condition = point<BaseAST>($3);
         ast->stmt = point<BaseAST>($5);
@@ -293,6 +324,7 @@ Decl
     | VarDecl{
         auto vd = point<BaseAST>($1);
         $$ = new DeclAST(vd,0);
+
     }
     ;
 VarDecl
@@ -303,11 +335,13 @@ VarDecl
 VarDefList
     : VarDef{
         $$ = $1;
+
     }
     | VarDef ',' VarDefList{
         auto list = point<BaseAST>($3);
         $1->AddItem(list);
         $$ = $1;
+
     }
     ;
 
@@ -321,12 +355,17 @@ VarDef
         auto initval = point<BaseAST>($3);
         $$ = new VarDefAST(name->c_str(),initval);
     }
+    | IDENT SETVAL InitVal{
+        auto name = std::unique_ptr<std::string>($1);
+        auto initval = point<BaseAST>($3);
+        $$ = new VarDefAST(name->c_str(),initval);
+    }
     ;
 
 InitVal:Exp;
 
 ConstDecl
-    : CONST INT ConstDefList ';'{
+    : Const INT ConstDefList ';'{
         $$ = $3;
     }
     ;
@@ -345,6 +384,11 @@ ConstDef
         string name = *unique_ptr<string>($1);
         auto exp = point<BaseAST>($3);
         $$ = new ConstDefAST(name,exp);
+    }
+    | IDENT SETVAL ConstInitVal{
+      string name = *unique_ptr<string>($1);
+      auto exp = point<BaseAST>($3);
+      $$ = new ConstDefAST(name,exp);
     }
     ;
 ConstInitVal : ConstExp;
