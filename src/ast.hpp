@@ -551,7 +551,7 @@ public:
     int Calc() const override{
         symboltype reslt= GetLvalValue(VAL_MAP,name);
         //存入的应该是const
-        assert(reslt.type==ValType::Const);
+        assert(reslt.type==ValType::Const||reslt.type==ValType::Var);
         return reslt.num;
     }
 

@@ -405,7 +405,9 @@ std::string LAndExpAST::DumpKoopa() const {
         return e_exp->DumpKoopa();
     else {
         reslt << l_exp->DumpKoopa();
-        /// TODO:短路运算
+
+//        if(l_exp->Calc()==0)
+//            return reslt.str();
         int leftnum = NAME_NUMBER - 1;
         reslt << e_exp->DumpKoopa();
         int rightnum = NAME_NUMBER - 1;
@@ -435,8 +437,9 @@ std::string LOrExpAST::DumpKoopa() const {
         return And_exp->DumpKoopa();
     else {
 
-        /// TODO:短路运算
         reslt << Or_exp->DumpKoopa();
+//        if(Or_exp->Calc()!=0)
+//            return reslt.str();
         int leftnum = NAME_NUMBER - 1;
         reslt << And_exp->DumpKoopa();
         int rightnum = NAME_NUMBER - 1;

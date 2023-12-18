@@ -42,7 +42,7 @@ Hexadecimal   0[xX][0-9a-fA-F]+
 "int"           { return INT; }
 "THEN"          { return Then;}
 "return"        { return RETURN; }
-"CONST"         { return Const; }
+"CONST"         { return CONSTINT; }
 "const"         { return Const; }
 "if"            { return If;}
 "else"          { return ELSE;}
@@ -65,6 +65,7 @@ Hexadecimal   0[xX][0-9a-fA-F]+
 "&&"            { return LAND; }
 "=="            { return EQ; }
 "!="            { return NEQ; }
+"<>"            { return NEQ; }
 ">="            { return GEQ; }
 "<="            { return LEQ; }
 

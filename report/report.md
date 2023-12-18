@@ -2,7 +2,11 @@
 
 ## 项目说明
 
-本项目为基于[北大编译实践在线文档](https://pku-minic.github.io/online-doc/#/),使用C++进行开发的玩具级编译器实现。该编译器可以将一个类c语言编译成RISCV汇编。
+本项目为基于[北大编译实践在线文档](https://pku-minic.github.io/online-doc/#/),完成了pl/0到RISCV汇编语言的编译。该编译器可以实现如下两个功能
+
+* 将pl/0语言编译为RISCV汇编语言
+
+* 将C语言编译为RISCV汇编语言
 
 开发使用工具如下：
 
@@ -11,7 +15,14 @@
 * 中间代码：基于北大编译实践开发的koopa库。相关代码的实现与规则定义在*Ast.\*中。
 * 目标代码：RISCV汇编。相关代码的实现与规则定义在createRiscV.cpp/hpp中。
 
-项目可编译结构如下：
+对于pl/0语言，项目可编译结构如下：
+
+* 可以识别 PROGRAM，BEGIN，END，CONST，VAR，WHILE，DO，IF等关键字
+* 可以识别':='等各种计算符
+* 可以编译while，if等控制结构
+* 可以编译文件中给出的示例源程序
+
+对于C语言，项目可编译结构如下：
 
 * 完成一般表达式编译。编译器可以处理如1+2=3等基本计算式
 * 完成常量，变量编译。完成对常量的编译预处理。编译器可以处理int a =123,b=245等赋值语句
@@ -20,33 +31,52 @@
 * 完成循环语句。编译器支持while，break和continue的循环控制
 * 完成函数与全局变量。编译器支持定义全局常变量，调用sysy库函数与自定义函数的编译。
 
-项目通过了北大编译实践原理的本地评测lab1-lab7。具体输出在testresult.txt.
+
+
+对于C语言编译为RISCV语言，项目通过了北大编译实践原理的本地评测lab1-lab7。具体输出在testresult.txt.
 
 ![1](./1.png)
+
+
 
 [这里](https://github.com/PublicCo/23-se-compiler)是我的实现的GitHub仓库。可以在git log中查看完整的开发记录
 
 ## 代码编译/使用
 
-本项目开发过程中，项目编译环境是基于[北大编译实践在线文档](https://pku-minic.github.io/online-doc/#/)提供的docker环境。你可以查看[这里](https://pku-minic.github.io/online-doc/#/lv0-env-config/)进行环境配置。当然，你也可以根据makefile内容进行本地环境配置。（通常来说，一台安装了flex和bison，可以正常编译c++程序的环境就可以编译运行）。
+本项目开发过程中，项目编译环境是基于[北大编译实践在线文档](https://pku-minic.github.io/online-doc/#/)提供的docker环境。你可以查看[这里](https://pku-minic.github.io/online-doc/#/lv0-env-config/)进行环境配置。当然，你也可以根据makefile内容进行本地环境配置。（通常来说，一台安装了flex和bison，可以正常编译c++程序的环境就可以编译运行，但是如果你希望能够尝试运行中间生成的koopa文件，必须采用该文档提供的docker环境）。
 
 本项目提供可执行程序。你可以在Linux环境下运行build/compiler。编译格式如下
 
 ~~~bash
-build/compiler -riscv your_program.c  -o your_output
+build/compiler -riscv your_program_filename  -o your_output
 ~~~
 
 你也可以查看代码的中间代码生成。编译格式如下：
 
 ~~~bash
-build/compiler -koopa your_program.c  -o your_output
+build/compiler -koopa your_program_filename  -o your_output
 ~~~
 
-项目提供了一个示例输出，可以试试
+项目根据期末作业文档提供了一个示例输出，可以试试
 
 ~~~bash
-build/compiler -koopa hello.c -o hello.out 
+build/compiler -riscv hello.pl -o hello.out 
 ~~~
+
+根据北大编译原理使用的[koopa库规范](https://pku-minic.github.io/online-doc/#/lv0-env-config/koopa) ,你可以通过以下bash命令编译运行生成的koopa文件。假设你编译后的文件名为hello.koopa，并且你当前的环境是上文中提到的docker镜像：
+
+~~~
+build/compiler -koopa your_filename -o hello.koopa
+koopac hello.koopa | llc --filetype=obj -o hello.o
+clang hello.o -L$CDE_LIBRARY_PATH/native -lsysy -o hello
+./hello
+~~~
+
+示例结果如下。蓝色框内为要编译的源代码，红色内为编译后输出的结果。其中putint(y)的意思是输出y的值，putch(10)的意思是输出ASCII码为10的字符（也就是回车）。根据示例程序的逻辑与输出结果可以看出编译后生成的中间koopa文件最终编译运行结果是正确的。
+
+![2](2.png)
+
+
 
 ## 代码说明
 
@@ -64,12 +94,25 @@ BlockComment  "/*"(?:[^\*]|\*+[^\/\*])*\*+\/
 然后匹配一部分指定的关键字
 
 ~~~flex
+{WhiteSpace}    { /* 忽略, 不做任何操作 */ }
+{LineComment}   { /* 忽略, 不做任何操作 */ }
+{BlockComment}  { /* 忽略, 不做任何操作 */ }
+"PROGRAM"       { return Program;}
+"BEGIN"         { return Begin;}
+
+"END"           { return End;}
+"DO"            { return Do;}
+"VAL"           { return INT; }
 "int"           { return INT; }
+"THEN"          { return Then;}
 "return"        { return RETURN; }
-"const"         { return CONST; }
-"if"            { return IF;}
+"CONST"         { return Const; }
+"const"         { return Const; }
+"if"            { return If;}
 "else"          { return ELSE;}
-"while"         { return WHILE; }
+
+"while"         { return While; }
+"WHILE"         { return While; }
 "break"         { return BREAK; }
 "continue"      { return CONTINUE; }
 "void"          { return VOID; }
@@ -78,9 +121,11 @@ BlockComment  "/*"(?:[^\*]|\*+[^\/\*])*\*+\/
 同时需要匹配一些双字符的符号表达式。
 
 ~~~flex
+":="            { return SETVAL;}
 "||"            { return LOR; }
 "&&"            { return LAND; }
 "=="            { return EQ; }
+"<>"            { return NEQ; }
 "!="            { return NEQ; }
 ">="            { return GEQ; }
 "<="            { return LEQ; }
@@ -99,9 +144,13 @@ BlockComment  "/*"(?:[^\*]|\*+[^\/\*])*\*+\/
 
 ### bison部分
 
-项目使用自顶向下的递归分析方法进行语法分析。你可以在[这里](https://pku-minic.github.io/online-doc/#/lv8-func-n-global/)看到本项目遵守的ENBF规范。
+项目使用自顶向下的递归分析方法进行语法分析。
 
-当然，由于受限于bison规则要求以及项目代码设计，部分特性实现不能完全基于ENBF。几个典型设计说明如下：
+* 对于pl/0部分，本项目遵守课程设计文件中要求的ENBF规范。
+
+* 对于C部分，你可以在[这里](https://pku-minic.github.io/online-doc/#/lv8-func-n-global/)看到本项目遵守的ENBF规范。
+
+当然，由于受限于bison规则要求以及项目代码设计，部分特性实现不能完全照抄ENBF。几个典型设计说明如下：
 
 * 单语句多变量赋值：
 
@@ -233,6 +282,42 @@ NotFinalStmt
 
   其中前三个分别是AST节点调试，koopa中间代码生成和编译期常量用。后两个用于函数之间的通信。通过复用trait，可以让实现的节点保持一定规范
 
+* 智能指针
+
+  bison的生成过程中会有各种内存申请。为了避免内存管理时出现多次释放与内存泄露，采用unique_ptr对每个语法树节点进行管理。智能指针类似于rust中的所有权分配，通过将内存分配给唯一一个指针，确保每次申请与析构都不会出现内存泄露
+
+* 一元运算符计算：
+
+  根据koopa规范，koopa并不支持二元运算符运算。因此需要使用一些操作来处理+，-，！
+
+  * +：不需要处理，+6和6是等价的
+  * -：用sub来处理，-6和表达式0-6是等价的
+  * ！：用比较运算来处理。!a与a == 0 是等价的
+
+* 优先级
+
+  对于运算符优先级，其实已经在BCNF中规定好了，只要遵守BCNF的设计进行实现即可
+
+  ~~~
+  Exp         ::= LOrExp;
+  PrimaryExp  ::= "(" Exp ")" | Number;
+  Number      ::= INT_CONST;
+  UnaryExp    ::= PrimaryExp | UnaryOp UnaryExp;
+  UnaryOp     ::= "+" | "-" | "!";
+  MulExp      ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
+  AddExp      ::= MulExp | AddExp ("+" | "-") MulExp;
+  RelExp      ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp;
+  EqExp       ::= RelExp | EqExp ("==" | "!=") RelExp;
+  LAndExp     ::= EqExp | LAndExp "&&" EqExp;
+  LOrExp      ::= LAndExp | LOrExp "||" LAndExp;
+  ~~~
+
+* 逻辑表达式
+
+  由于Koopa并不支持逻辑与或，生成的代码需要通过比较式进行拼接。例如：a&&b的实现方式为:
+
+  (a eq 0)+(b eq 0) eq 0.  其中a eq b返回一个01真值，若a等于b返回1否则返回0
+
 * 变量表
 
   变量表是使用一个unordered_map的vector实现的。每一个block使用一个unordered_map，搜索变量时从最后进vector的map向前搜。这样就实现了底层屏蔽高层的特性。
@@ -330,5 +415,6 @@ NotFinalStmt
 
 * 花了30+h的时间，大半时间在用命令行看gdb栈帧检索报错语法节点。好的开发环境可以事半功倍（唉……）
 * 熟悉flex和bison以及koopa.h有助于避免堆垃圾代码
+* pl/0和C本质是一个东西，只是用的关键字不一样，添加功能非常简单
 * 好的代码结构设计与解耦设计有助于在接下来的迭代下可以继续添加内容。本项目前后端都经过了10次以上的迭代，几乎要重构了……
 * 减少用全局变量。在开发中将符号表设为了全局变量，在接下来的维护中这些全局变量的维护变成非常非常棘手的事情。可能应该新设计一个controller类可以让全局变量变化没那么糟糕……
