@@ -4,6 +4,7 @@
     #include<cstring>
     #include "ast.hpp"
     #include "IfElseAst.hpp"
+    #include <iostream>
 }
 
 %{
@@ -39,7 +40,7 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN Const If ELSE While BREAK CONTINUE VOID Program Then Do SETVAL CONSTINT
+%token INT RETURN Const If ELSE While BREAK CONTINUE VOID Program Then Do SETVAL CONSTINT Begin End
 %token <str_val> IDENT LOR LAND EQ NEQ GEQ LEQ
 %token <int_val> INT_CONST
 
@@ -149,12 +150,19 @@ FuncDef
         $$ = new FuncDefAST(type, ident->c_str(), block);
     }
     | Program IDENT BlockItemList{
+        cerr<<"Program"<<endl;
         auto tmp = new FuncTypeAST("void");
         auto type = point<BaseAST>(tmp);
         auto ident = std::unique_ptr<std::string>($2);
         auto block = std::unique_ptr<BaseAST>($3);
         $$ = new FuncDefAST(type, ident->c_str(), block);
-
+    }
+    |Program IDENT Block{
+        auto tmp = new FuncTypeAST("void");
+        auto type = point<BaseAST>(tmp);
+        auto ident = std::unique_ptr<std::string>($2);
+        auto block = std::unique_ptr<BaseAST>($3);
+        $$ = new FuncDefAST(type, ident->c_str(), block);
     }
     ;
 FuncFParamList
@@ -184,6 +192,14 @@ Block
         auto ast = new BlockAST();
         $$ = ast;
     }
+    | Begin BlockItemList End{
+        auto stmt = std::unique_ptr<BaseAST>($2);
+        $$ = new BlockAST(stmt);
+    }
+    | Begin End{
+        auto ast = new BlockAST();
+        $$ = ast;
+    }
     ;
 BlockItemList
     : BlockItem{
@@ -193,9 +209,10 @@ BlockItemList
         auto list = std::unique_ptr<BlockItemAST>($2);
         auto stmt = $1;
         stmt->AddItem(list);
-
+        cerr<<"BlockItemList"<<endl;
         $$ = stmt;
     }
+
 BlockItem
     :
     Decl{
@@ -234,6 +251,7 @@ FinalStmt
         stmt->num = std::unique_ptr<BaseAST>($1);
         $$ = stmt;
     }
+
     | Exp ';'{
         auto stmt = new StmtAST();
         stmt->type = StmtType::OneExp;
@@ -247,6 +265,7 @@ FinalStmt
         $$ = stmt;
     }
     | If '(' Exp ')' FinalStmt ELSE FinalStmt{
+        cerr<<"if here"<<endl;
         auto ast = new IfElseAST();
         ast->sequence = point<BaseAST>($3);
         ast->ifexp = point<BaseAST>($5);
@@ -263,6 +282,7 @@ FinalStmt
         $$ = $1;
     }
     | While Exp Do Stmt{
+        cerr<<"while stmt"<<endl;
         auto ast = new WhileAST();
         ast->condition = point<BaseAST>($2);
         ast->stmt = point<BaseAST>($4);

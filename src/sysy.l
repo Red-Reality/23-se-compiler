@@ -34,17 +34,18 @@ Hexadecimal   0[xX][0-9a-fA-F]+
 {LineComment}   { /* 忽略, 不做任何操作 */ }
 {BlockComment}  { /* 忽略, 不做任何操作 */ }
 "PROGRAM"       { return Program;}
-"BEGIN"         { /* 忽略, 不做任何操作 */}
+"BEGIN"         { return Begin;}
 ":="            { return SETVAL;}
-"END"           { /* 忽略, 不做任何操作 */}
+"END"           { return End;}
 "DO"            { return Do;}
-"VAL"           { return INT; }
+"VAR"           { return INT; }
 "int"           { return INT; }
 "THEN"          { return Then;}
 "return"        { return RETURN; }
 "CONST"         { return CONSTINT; }
 "const"         { return Const; }
 "if"            { return If;}
+"IF"            { return If;}
 "else"          { return ELSE;}
 
 "while"         { return While; }
